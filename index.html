@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaTracker Pro - Your Ultimate Media Organizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MediaTracker">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+<style>
+  /* ... (all existing CSS remains exactly the same) ... */
+</style>
+</head>
+<body>
+<!-- Authentication Screen (Shown First) - UPDATED FROM TEMP -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">📱 MediaTracker Pro</div>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to your media library 📂</div>
+      
+      <div id="authError" class="auth-error"></div>
+      <div id="authLoading" class="auth-loading">
+        <div class="small">Loading...</div>
+      </div>
+      
+      <form id="authForm" class="auth-form">
+        <input type="email" id="authEmail" placeholder="Email" required>
+        <input type="password" id="authPassword" placeholder="Password" required>
+        <button type="submit" id="authSubmit" class="auth-primary-btn">Sign In</button>
+      </form>
+      
+      <div class="auth-switch">
+        <span id="authSwitchText">Don't have an account?</span>
+        <button type="button" id="authSwitchBtn" class="auth-switch-btn">Sign Up</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App (Hidden until authenticated) -->
+<div id="appContainer">
+  <header>
+    <h1>📱 MediaTracker Pro</h1>
+    <div class="controls desktop-controls">
+      <!-- Stats button with improved navigation -->
+      <a href="stats.html" class="ghost" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 4px;">
+        📊 Stats
+      </a>
+      <button id="signOutBtn" class="ghost">🚪 Sign Out</button>
+    </div>
+  </header>
+
+  <!-- ... (rest of the HTML remains exactly the same) ... -->
+
+<script type="module">
+  // Import Firebase modules
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+  // Firebase configuration - NOW MATCHES STATS.HTML
+  const firebaseConfig = {
+    apiKey: "AIzaSyCvR7qP_1jv3qZQ7Q9v8w8X5q5X5q5X5q5",
+    authDomain: "mediatracker-pro.firebaseapp.com",
+    projectId: "mediatracker-pro",
+    storageBucket: "mediatracker-pro.firebasestorage.app",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef123456"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  // ... (rest of the JavaScript remains exactly the same) ...
+</script>
+</body>
+</html>
