@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoTrack — Stats & Insights</title>
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+      import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+        authDomain: "personalplayer-c8d3b.firebaseapp.com",
+        projectId: "personalplayer-c8d3b",
+        storageBucket: "personalplayer-c8d3b.firebasestorage.app",
+        messagingSenderId: "396785312809",
+        appId: "1:396785312809:web:02290950ec22a13165a838"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      const storage = getStorage(app);
+
+      // Make Firebase available globally
+      window.firebase = { 
+        auth, 
+        db, 
+        storage, 
+        onAuthStateChanged, 
+        doc, 
+        getDoc, 
+        updateDoc, 
+        setDoc,
+        collection,
+        getDocs,
+        ref, 
+        uploadBytes, 
+        getDownloadURL 
+      };
+      
+      console.log("Firebase initialized in stats page");
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #15202b;
+            --card: #192734;
+            --muted: #8899a6;
+            --accent: #1d9bf0;
+            --glass: rgba(255, 255, 255, 0.03);
+            --radius: 16px;
+            --border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Make the layout fill the full screen */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            background-color: var(--bg);
+            color: white;
+            line-height: 1.5;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: none; /* remove the 600px limit */
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Make all sections expand edge-to-edge horizontally */
+        .profile-header,
+        .stats-section,
+        .add-profile-section,
+        .profile-selector {
+            border-radius: 0;
+            width: 100%;
+            margin: 0;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        
+        /* Header Section */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: rgba(21, 32, 43, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: var(--border);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .back-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            transition: background-color 0.2s;
+        }
+        
+        .back-btn:hover {
+            background-color: rgba(29, 155, 240, 0.1);
+        }
+        
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .sync-status {
+            font-size: 12px;
+            color: var(--muted);
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Twitter-like Profile Header */
+        .profile-header {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        
+        .header-banner {
+            height: 200px;
+            background: var(--card);
+            width: 100%;
+            position: relative;
+            cursor: pointer;
+            overflow: visible; /* Changed from hidden to visible to prevent cutting */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .header-banner.drag-over {
+            border: 2px dashed var(--accent);
+            background-color: rgba(29, 155, 240, 0.1);
+        }
+        
+        .header-banner:hover::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+        
+        .header-banner:hover::before {
+            content: 'Change Banner';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .banner-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Changed from cover to contain to show full image */
+        }
+        
+        .banner-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card);
+            color: var(--muted);
+            font-size: 40px;
+        }
+        
+        .profile-info-section {
+            padding: 0 16px;
+        }
+        
+        .profile-avatar-container {
+            position: absolute;
+            top: 140px;
+            left: 16px;
+            width: 134px;
+            height: 134px;
+            border-radius: 50%;
+            border: 4px solid var(--bg);
+            background-color: var(--card);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .profile-avatar-container.drag-over {
+            border: 2px dashed var(--accent);
+            background-color: rgba(29, 155, 240, 0.1);
+        }
+        
+        .profile-avatar-container:hover {
+            filter: brightness(0.9);
+        }
+        
+        .profile-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .profile-avatar-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card);
+            color: var(--muted);
+            font-size: 50px;
+        }
+        
+        .profile-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding: 16px 0;
+            gap: 10px;
+        }
+        
+        .profile-details {
+            margin-top: 60px;
+            padding-bottom: 16px;
+            border-bottom: var(--border);
+        }
+        
+        .profile-name {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        
+        .profile-username {
+            color: var(--muted);
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        
+        .profile-bio {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        
+        .profile-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+        
+        .profile-stat strong {
+            color: white;
+        }
+        
+        /* Add Profile Section */
+        .add-profile-section {
+            padding: 16px;
+            display: flex;
+            justify-content: flex-start;
+            border-bottom: var(--border);
+        }
+        
+        .add-profile-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .add-profile-btn:hover {
+            background-color: rgba(29, 155, 240, 0.1);
+        }
+        
+        /* Stats Section */
+        .stats-section {
+            padding: 16px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background-color: var(--card);
+            border-radius: var(--radius);
+            padding: 16px;
+            border: var(--border);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+        
+        /* Pie Chart Section */
+        .pie-chart-section {
+            background-color: var(--card);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            border: var(--border);
+        }
+        
+        .pie-chart-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        
+        .pie-chart-container {
+            position: relative;
+            height: 250px;
+            margin: 0 auto;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            border: var(--border);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 800;
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .close-modal:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+        
+        .form-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        
+        .btn-primary:hover {
+            background: #1a8cd8;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        /* Error Message */
+        .error-message {
+            background: rgba(244, 33, 46, 0.1);
+            border: 1px solid rgba(244, 33, 46, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px;
+            text-align: center;
+            color: #f4212e;
+        }
+        
+        .error-message a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .error-message a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Auth Section */
+        .auth-section {
+            padding: 40px 16px;
+            text-align: center;
+        }
+        
+        .auth-message {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--muted);
+        }
+        
+        .login-btn {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            transition: background-color 0.2s;
+        }
+        
+        .login-btn:hover {
+            background: #1a8cd8;
+        }
+        
+        /* Upload Progress */
+        .upload-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+        
+        .upload-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Drag and Drop Instructions */
+        .drag-instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .drag-over .drag-instructions {
+            opacity: 1;
+        }
+        
+        /* Success indicator */
+        .upload-success {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(23, 191, 99, 0.9);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .upload-success.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button class="back-btn" id="backBtn">←</button>
+            <div class="header-title">Profile</div>
+            <div class="sync-status" id="syncStatus">• Checking authentication...</div>
+        </div>
+
+        <!-- Auth Required Message (shown when not logged in) -->
+        <div id="authRequired" class="auth-section" style="display: none;">
+            <div class="auth-message">Please log in to view your profile and stats</div>
+            <button class="login-btn" id="loginBtn">Log In</button>
+        </div>
+
+        <!-- Main Content (shown when logged in) -->
+        <div id="mainContent" style="display: none;">
+            <!-- Twitter-like Profile Header -->
+            <div class="profile-header">
+                <div class="header-banner" id="headerBanner">
+                    <div class="banner-placeholder" id="bannerPlaceholder">
+                        +
+                    </div>
+                    <img class="banner-image" id="bannerImage" style="display: none;" alt="Banner Image">
+                    <input type="file" id="bannerInput" class="file-input" accept="image/*">
+                    <div class="drag-instructions">Drop image here to set as banner</div>
+                    <div class="upload-success" id="bannerUploadSuccess">✓</div>
+                </div>
+                <div class="profile-info-section">
+                    <div class="profile-avatar-container" id="profileAvatarContainer">
+                        <div class="profile-avatar-placeholder" id="profileAvatarPlaceholder">
+                            +
+                        </div>
+                        <img class="profile-avatar" id="profileAvatar" style="display: none;" alt="Profile Picture">
+                        <input type="file" id="avatarInput" class="file-input" accept="image/*">
+                        <div class="drag-instructions">Drop image here to set as profile picture</div>
+                        <div class="upload-success" id="avatarUploadSuccess">✓</div>
+                    </div>
+                    
+                    <div class="profile-actions">
+                        <button class="btn" id="editProfileBtn" style="display: none;">Edit profile</button>
+                    </div>
+                    
+                    <div class="profile-details">
+                        <h1 class="profile-name" id="profileName"></h1>
+                        <div class="profile-username" id="profileUsername" style="display: none;"></div>
+                        <div class="profile-bio" id="profileBio"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Profile Section - Only shown when no profiles exist -->
+            <div class="add-profile-section" id="addProfileSection" style="display: none;">
+                <button class="add-profile-btn" id="addProfileBtn">
+                    <span>+</span> Add Profile
+                </button>
+            </div>
+
+            <!-- Stats Section -->
+            <div class="stats-section">
+                <h2 class="section-title">Stats & Insights</h2>
+                
+                <!-- Stats Grid - Updated to 3 columns -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="videosUploaded">0</div>
+                        <div class="stat-label">Videos Uploaded</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="imagesUploaded">0</div>
+                        <div class="stat-label">Images Uploaded</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalWatchTime">0h</div>
+                        <div class="stat-label">Total Watch Time</div>
+                    </div>
+                </div>
+                
+                <!-- Pie Chart Section -->
+                <div class="pie-chart-section">
+                    <h3 class="pie-chart-title">Content Distribution</h3>
+                    <div class="pie-chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Profile Modal -->
+    <div class="modal" id="addProfileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Profile</h3>
+                <button class="close-modal" id="closeModal">&times;</button>
+            </div>
+            <form id="profileForm">
+                <div class="form-group">
+                    <label class="form-label" for="newProfileName">Profile Name</label>
+                    <input type="text" id="newProfileName" class="form-input" placeholder="Enter profile name" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal" id="editProfileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Profile</h3>
+                <button class="close-modal" id="closeEditModal">&times;</button>
+            </div>
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label class="form-label" for="editProfileName">Display Name</label>
+                    <input type="text" id="editProfileName" class="form-input" placeholder="Your display name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="editProfileBio">Bio</label>
+                    <input type="text" id="editProfileBio" class="form-input" placeholder="Tell us about yourself">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn" id="cancelEditBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase state management
+        let currentUser = null;
+        let userProfileData = null;
+        let userProfiles = [];
+        let pieChart = null;
+
+        // Update sync status
+        function updateSyncStatus(message, isError = false) {
+            const statusEl = document.getElementById('syncStatus');
+            statusEl.textContent = message;
+            statusEl.className = `sync-status ${isError ? 'error' : ''}`;
+        }
+
+        // Show/hide auth required message
+        function showAuthRequired() {
+            document.getElementById('authRequired').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        function hideAuthRequired() {
+            document.getElementById('authRequired').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        // Load user profile data from Firestore
+        async function loadUserProfile() {
+            if (!currentUser) return null;
+
+            try {
+                const userDocRef = window.firebase.doc(window.firebase.db, 'users', currentUser.uid);
+                const userDoc = await window.firebase.getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    return userDoc.data();
+                } else {
+                    // Create initial user data structure
+                    const initialData = {
+                        profiles: [],
+                        watchProgress: {},
+                        watchHistory: {},
+                        profilePicture: null,
+                        bannerPicture: null,
+                        displayName: '',
+                        bio: '',
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    // Save initial data
+                    await window.firebase.setDoc(userDocRef, initialData);
+                    return initialData;
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+                updateSyncStatus('⚠️ Failed to load profile', true);
+                return null;
+            }
+        }
+
+        // Load profiles from user data
+        async function loadProfiles() {
+            if (!currentUser || !userProfileData) return [];
+            
+            try {
+                return userProfileData.profiles || [];
+            } catch (error) {
+                console.error('Error loading profiles:', error);
+                return [];
+            }
+        }
+
+        // Update profile picture in UI
+        function updateProfilePicture(profilePictureUrl) {
+            const placeholder = document.getElementById('profileAvatarPlaceholder');
+            const profilePicture = document.getElementById('profileAvatar');
+            
+            if (profilePictureUrl) {
+                profilePicture.src = profilePictureUrl;
+                profilePicture.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                profilePicture.style.display = 'none';
+                placeholder.style.display = 'flex';
+            }
+        }
+
+        // Update banner image in UI
+        function updateBannerImage(bannerPictureUrl) {
+            const placeholder = document.getElementById('bannerPlaceholder');
+            const bannerImage = document.getElementById('bannerImage');
+            
+            if (bannerPictureUrl) {
+                bannerImage.src = bannerPictureUrl;
+                bannerImage.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                bannerImage.style.display = 'none';
+                placeholder.style.display = 'flex';
+            }
+        }
+
+        // Update user info in UI
+        function updateUserInfo() {
+            if (currentUser && userProfileData) {
+                const displayName = userProfileData.displayName || '';
+                const bio = userProfileData.bio || '';
+                
+                document.getElementById('profileName').textContent = displayName;
+                document.getElementById('profileBio').textContent = bio;
+                
+                // Hide username element completely
+                document.getElementById('profileUsername').style.display = 'none';
+                
+                // Update profile picture if available
+                if (userProfileData.profilePicture) {
+                    updateProfilePicture(userProfileData.profilePicture);
+                }
+                
+                // Update banner image if available
+                if (userProfileData.bannerPicture) {
+                    updateBannerImage(userProfileData.bannerPicture);
+                }
+            }
+        }
+
+        // Upload profile picture to Firebase Storage (without wait times)
+        async function uploadProfilePicture(file) {
+            if (!currentUser || !file) return null;
+
+            try {
+                // Show immediate success indicator
+                const successIndicator = document.getElementById('avatarUploadSuccess');
+                successIndicator.classList.add('show');
+                
+                // Preview image immediately
+                previewImage(file, 'profileAvatar');
+                
+                // Upload in background without blocking
+                setTimeout(async () => {
+                    try {
+                        // Create a reference to the profile picture
+                        const storageRef = window.firebase.ref(window.firebase.storage, `profile-pictures/${currentUser.uid}`);
+                        
+                        // Upload the file
+                        const snapshot = await window.firebase.uploadBytes(storageRef, file);
+                        
+                        // Get the download URL
+                        const downloadURL = await window.firebase.getDownloadURL(snapshot.ref);
+                        
+                        // Update user data in Firestore
+                        const userDocRef = window.firebase.doc(window.firebase.db, 'users', currentUser.uid);
+                        await window.firebase.updateDoc(userDocRef, {
+                            profilePicture: downloadURL
+                        });
+                        
+                        // Update local data
+                        userProfileData.profilePicture = downloadURL;
+                        
+                        // Hide success indicator after 2 seconds
+                        setTimeout(() => {
+                            successIndicator.classList.remove('show');
+                        }, 2000);
+                        
+                        console.log('Profile picture uploaded successfully');
+                    } catch (error) {
+                        console.error('Error uploading profile picture:', error);
+                        successIndicator.classList.remove('show');
+                    }
+                }, 100);
+                
+                return true;
+            } catch (error) {
+                console.error('Error uploading profile picture:', error);
+                return null;
+            }
+        }
+
+        // Upload banner image to Firebase Storage (without wait times)
+        async function uploadBannerImage(file) {
+            if (!currentUser || !file) return null;
+
+            try {
+                // Show immediate success indicator
+                const successIndicator = document.getElementById('bannerUploadSuccess');
+                successIndicator.classList.add('show');
+                
+                // Preview image immediately
+                previewImage(file, 'bannerImage');
+                
+                // Upload in background without blocking
+                setTimeout(async () => {
+                    try {
+                        // Create a reference to the banner image
+                        const storageRef = window.firebase.ref(window.firebase.storage, `banner-images/${currentUser.uid}`);
+                        
+                        // Upload the file
+                        const snapshot = await window.firebase.uploadBytes(storageRef, file);
+                        
+                        // Get the download URL
+                        const downloadURL = await window.firebase.getDownloadURL(snapshot.ref);
+                        
+                        // Update user data in Firestore
+                        const userDocRef = window.firebase.doc(window.firebase.db, 'users', currentUser.uid);
+                        await window.firebase.updateDoc(userDocRef, {
+                            bannerPicture: downloadURL
+                        });
+                        
+                        // Update local data
+                        userProfileData.bannerPicture = downloadURL;
+                        
+                        // Hide success indicator after 2 seconds
+                        setTimeout(() => {
+                            successIndicator.classList.remove('show');
+                        }, 2000);
+                        
+                        console.log('Banner image uploaded successfully');
+                    } catch (error) {
+                        console.error('Error uploading banner image:', error);
+                        successIndicator.classList.remove('show');
+                    }
+                }, 100);
+                
+                return true;
+            } catch (error) {
+                console.error('Error uploading banner image:', error);
+                return null;
+            }
+        }
+
+        // Preview image locally before upload
+        function previewImage(file, targetElementId) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const target = document.getElementById(targetElementId);
+                target.src = e.target.result;
+                target.style.display = 'block';
+                
+                // Hide the placeholder
+                const placeholder = targetElementId === 'profileAvatar' 
+                    ? document.getElementById('profileAvatarPlaceholder')
+                    : document.getElementById('bannerPlaceholder');
+                placeholder.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Update UI based on profile state
+        function updateUI() {
+            const addProfileSection = document.getElementById('addProfileSection');
+            const editProfileBtn = document.getElementById('editProfileBtn');
+            
+            if (userProfiles.length === 0) {
+                // No profiles - show add profile button, hide edit button
+                addProfileSection.style.display = 'flex';
+                editProfileBtn.style.display = 'none';
+            } else {
+                // Profiles exist - hide add profile section, show edit button
+                addProfileSection.style.display = 'none';
+                editProfileBtn.style.display = 'block';
+            }
+        }
+
+        // Add new profile to Firestore
+        async function addProfile(profileName) {
+            if (!currentUser) return false;
+            
+            try {
+                // Create new profile
+                const newProfile = {
+                    id: Date.now().toString(),
+                    name: profileName,
+                    createdAt: new Date().toISOString()
+                };
+                
+                // Add to profiles array
+                const updatedProfiles = [...userProfiles, newProfile];
+                
+                // Update Firestore
+                const userDocRef = window.firebase.doc(window.firebase.db, 'users', currentUser.uid);
+                await window.firebase.updateDoc(userDocRef, {
+                    profiles: updatedProfiles
+                });
+                
+                // Update local data
+                userProfiles = updatedProfiles;
+                userProfileData.profiles = updatedProfiles;
+                
+                // Update UI
+                updateUI();
+                
+                updateSyncStatus('✓ Profile created successfully');
+                return true;
+            } catch (error) {
+                console.error('Error adding profile:', error);
+                updateSyncStatus('⚠️ Failed to create profile', true);
+                return false;
+            }
+        }
+
+        // Update user profile in Firestore
+        async function updateUserProfile(updates) {
+            if (!currentUser) return false;
+            
+            try {
+                const userDocRef = window.firebase.doc(window.firebase.db, 'users', currentUser.uid);
+                await window.firebase.updateDoc(userDocRef, updates);
+                
+                // Update local data
+                userProfileData = { ...userProfileData, ...updates };
+                
+                updateSyncStatus('✓ Profile updated');
+                return true;
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                updateSyncStatus('⚠️ Failed to update profile', true);
+                return false;
+            }
+        }
+
+        // Calculate stats from actual user data
+        function calculateStats(data, selectedProfile = 'all') {
+            const stats = {
+                videosUploaded: 0,
+                imagesUploaded: 0,
+                totalWatchTime: 0,
+                totalFiles: 0,
+                totalSize: 0,
+                foldersCount: 0
+            };
+
+            // Helper function to recursively count media in folders
+            function countMediaInFolders(folders) {
+                let videos = 0;
+                let images = 0;
+                let totalSizeBytes = 0;
+
+                function processFolder(folder) {
+                    // Count items in current folder
+                    if (folder.items && Array.isArray(folder.items)) {
+                        folder.items.forEach(item => {
+                            if (item.type === 'video') {
+                                videos++;
+                            } else if (item.type === 'photo') {
+                                images++;
+                            }
+                            
+                            // Calculate total file size (convert from formatted string if needed)
+                            if (item.size) {
+                                const sizeMatch = item.size.match(/([\d.]+)\s*(\w+)/);
+                                if (sizeMatch) {
+                                    const value = parseFloat(sizeMatch[1]);
+                                    const unit = sizeMatch[2].toUpperCase();
+                                    let bytes = value;
+                                    
+                                    switch(unit) {
+                                        case 'KB': bytes = value * 1024; break;
+                                        case 'MB': bytes = value * 1024 * 1024; break;
+                                        case 'GB': bytes = value * 1024 * 1024 * 1024; break;
+                                    }
+                                    totalSizeBytes += bytes;
+                                }
+                            }
+                        });
+                    }
+
+                    // Process subfolders recursively
+                    if (folder.subfolders && Array.isArray(folder.subfolders)) {
+                        folder.subfolders.forEach(processFolder);
+                    }
+                }
+
+                // Process all folders
+                folders.forEach(processFolder);
+
+                return { videos, images, totalSizeBytes };
+            }
+
+            // Count folders recursively
+            function countFolders(folders) {
+                let count = 0;
+                
+                function countFolder(folder) {
+                    count++;
+                    if (folder.subfolders && Array.isArray(folder.subfolders)) {
+                        folder.subfolders.forEach(countFolder);
+                    }
+                }
+                
+                folders.forEach(countFolder);
+                return count;
+            }
+
+            try {
+                // Check if we have media folders data
+                if (data && data.folders && Array.isArray(data.folders)) {
+                    const mediaCounts = countMediaInFolders(data.folders);
+                    
+                    stats.videosUploaded = mediaCounts.videos;
+                    stats.imagesUploaded = mediaCounts.images;
+                    stats.totalFiles = mediaCounts.videos + mediaCounts.images;
+                    stats.totalSize = mediaCounts.totalSizeBytes;
+                    stats.foldersCount = countFolders(data.folders);
+                    
+                    // Calculate watch time (this would need actual watch history data)
+                    // For now, estimate based on video count (assuming average 10 min per video)
+                    const averageVideoMinutes = 10;
+                    stats.totalWatchTime = Math.round((mediaCounts.videos * averageVideoMinutes) / 60);
+                } else {
+                    console.log('No folders data found in user profile');
+                }
+            } catch (error) {
+                console.error('Error calculating stats:', error);
+            }
+
+            return stats;
+        }
+
+        // Update stats on the page
+        function updateStats() {
+            const stats = calculateStats(userProfileData);
+            
+            // Update stat cards with new metrics
+            document.getElementById('videosUploaded').textContent = stats.videosUploaded;
+            document.getElementById('imagesUploaded').textContent = stats.imagesUploaded;
+            document.getElementById('totalWatchTime').textContent = `${stats.totalWatchTime}h`;
+            
+            // Update pie chart if it exists
+            if (pieChart) {
+                updatePieChart();
+            }
+            
+            // Log detailed stats for debugging
+            console.log('Media Stats:', {
+                videos: stats.videosUploaded,
+                images: stats.imagesUploaded,
+                totalFiles: stats.totalFiles,
+                totalSize: formatBytes(stats.totalSize),
+                folders: stats.foldersCount,
+                watchTime: stats.totalWatchTime + ' hours'
+            });
+        }
+
+        // Helper function to format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Create or update pie chart
+        function updatePieChart() {
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            const stats = calculateStats(userProfileData);
+            
+            // Destroy existing chart if it exists
+            if (pieChart) {
+                pieChart.destroy();
+            }
+            
+            // Create new chart
+            pieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Videos', 'Images'],
+                    datasets: [{
+                        data: [stats.videosUploaded, stats.imagesUploaded],
+                        backgroundColor: [
+                            'rgba(29, 155, 240, 0.8)',
+                            'rgba(120, 86, 255, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(29, 155, 240, 1)',
+                            'rgba(120, 86, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: 'white',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize the application
+        async function initApp() {
+            // Set up authentication state observer
+            window.firebase.onAuthStateChanged(window.firebase.auth, async (user) => {
+                if (user) {
+                    // User is signed in
+                    currentUser = user;
+                    updateSyncStatus('✓ Signed in as ' + user.email);
+                    hideAuthRequired();
+                    
+                    // Load user profile data
+                    userProfileData = await loadUserProfile();
+                    
+                    if (userProfileData) {
+                        // Load profiles
+                        userProfiles = await loadProfiles();
+                        
+                        // Update UI with user data
+                        updateUserInfo();
+                        updateUI();
+                        updateStats();
+                        updatePieChart();
+                    }
+                } else {
+                    // User is signed out
+                    currentUser = null;
+                    userProfileData = null;
+                    userProfiles = [];
+                    updateSyncStatus('• Not signed in');
+                    showAuthRequired();
+                }
+            });
+        }
+
+        // Set up drag and drop functionality
+        function setupDragAndDrop() {
+            const avatarContainer = document.getElementById('profileAvatarContainer');
+            const bannerContainer = document.getElementById('headerBanner');
+            const avatarInput = document.getElementById('avatarInput');
+            const bannerInput = document.getElementById('bannerInput');
+            
+            // Handle drag events for profile avatar
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                avatarContainer.addEventListener(eventName, preventDefaults, false);
+                bannerContainer.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                avatarContainer.addEventListener(eventName, () => {
+                    avatarContainer.classList.add('drag-over');
+                }, false);
+                
+                bannerContainer.addEventListener(eventName, () => {
+                    bannerContainer.classList.add('drag-over');
+                }, false);
+            });
+            
+            // Remove highlight when item leaves
+            ['dragleave', 'drop'].forEach(eventName => {
+                avatarContainer.addEventListener(eventName, () => {
+                    avatarContainer.classList.remove('drag-over');
+                }, false);
+                
+                bannerContainer.addEventListener(eventName, () => {
+                    bannerContainer.classList.remove('drag-over');
+                }, false);
+            });
+            
+            // Handle file drop
+            avatarContainer.addEventListener('drop', (e) => {
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    uploadProfilePicture(file);
+                }
+            }, false);
+            
+            bannerContainer.addEventListener('drop', (e) => {
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    uploadBannerImage(file);
+                }
+            }, false);
+            
+            // Handle click to select file
+            avatarContainer.addEventListener('click', () => {
+                avatarInput.click();
+            });
+            
+            bannerContainer.addEventListener('click', () => {
+                bannerInput.click();
+            });
+            
+            // Handle file selection via input
+            avatarInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    uploadProfilePicture(file);
+                }
+            });
+            
+            bannerInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    uploadBannerImage(file);
+                }
+            });
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // Back button
+            document.getElementById('backBtn').addEventListener('click', () => {
+                window.history.back();
+            });
+            
+            // Login button
+            document.getElementById('loginBtn').addEventListener('click', () => {
+                window.location.href = 'index.html';
+            });
+            
+            // Add profile button
+            document.getElementById('addProfileBtn').addEventListener('click', () => {
+                document.getElementById('addProfileModal').style.display = 'flex';
+            });
+            
+            // Edit profile button
+            document.getElementById('editProfileBtn').addEventListener('click', () => {
+                // Populate the form with current data
+                document.getElementById('editProfileName').value = userProfileData.displayName || '';
+                document.getElementById('editProfileBio').value = userProfileData.bio || '';
+                
+                // Show the modal
+                document.getElementById('editProfileModal').style.display = 'flex';
+            });
+            
+            // Close modal buttons
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('addProfileModal').style.display = 'none';
+            });
+            
+            document.getElementById('closeEditModal').addEventListener('click', () => {
+                document.getElementById('editProfileModal').style.display = 'none';
+            });
+            
+            document.getElementById('cancelBtn').addEventListener('click', () => {
+                document.getElementById('addProfileModal').style.display = 'none';
+            });
+            
+            document.getElementById('cancelEditBtn').addEventListener('click', () => {
+                document.getElementById('editProfileModal').style.display = 'none';
+            });
+            
+            // Profile form submission
+            document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const profileName = document.getElementById('newProfileName').value.trim();
+                
+                if (profileName) {
+                    const success = await addProfile(profileName);
+                    if (success) {
+                        document.getElementById('addProfileModal').style.display = 'none';
+                        document.getElementById('newProfileName').value = '';
+                    }
+                }
+            });
+            
+            // Edit profile form submission
+            document.getElementById('editProfileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const displayName = document.getElementById('editProfileName').value.trim();
+                const bio = document.getElementById('editProfileBio').value.trim();
+                
+                const success = await updateUserProfile({
+                    displayName,
+                    bio
+                });
+                
+                if (success) {
+                    document.getElementById('editProfileModal').style.display = 'none';
+                    updateUserInfo();
+                }
+            });
+            
+            // Close modals when clicking outside
+            window.addEventListener('click', (e) => {
+                const addProfileModal = document.getElementById('addProfileModal');
+                const editProfileModal = document.getElementById('editProfileModal');
+                
+                if (e.target === addProfileModal) {
+                    addProfileModal.style.display = 'none';
+                }
+                
+                if (e.target === editProfileModal) {
+                    editProfileModal.style.display = 'none';
+                }
+            });
+        }
+
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            setupEventListeners();
+            setupDragAndDrop();
+        });
+    </script>
+</body>
+</html>
