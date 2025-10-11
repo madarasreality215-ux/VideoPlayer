@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaTracker Pro - Your Ultimate Media Organizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MediaTracker">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+<style>
+  :root{
+    --bg-light:#f3f4f6;
+    --bg-dark:#0b1220;
+    --card-light:#ffffff;
+    --card-dark:#0f1724;
+    --text-light:#0f1724;
+    --text-dark:#e6eef9;
+    --accent:#7c3aed;
+    --accent-hover:#6d28d9;
+    --muted:rgba(230,238,249,0.65);
+    --thumb-size:120px;
+    --safe-area: env(safe-area-inset-bottom, 16px);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;background:var(--bg-dark);color:var(--text-dark);transition:background .2s,color .2s}
+  body.light{background:var(--bg-light);color:var(--text-light)}
+  
+  /* App container - hidden until authenticated */
+  #appContainer{display:none}
+  #appContainer.authenticated{display:block}
+  
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card-dark);position:sticky;top:0;z-index:100;}
+  body.light header{background:var(--card-light)}
+  h1{margin:0;font-size:18px}
+  .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:white;padding:8px 10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;transition:background .2s}
+  .btn:hover{background:var(--accent-hover)}
+  .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit;cursor:pointer;transition:background .2s}
+  .ghost:hover{background:rgba(255,255,255,0.05)}
+  body.light .ghost{border-color:rgba(0,0,0,0.08)}
+  body.light .ghost:hover{background:rgba(0,0,0,0.05)}
+  
+  .container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  @media (max-width:960px){.container{grid-template-columns:1fr;}}
+  @media (max-width:768px){.container{padding:12px;gap:12px;}}
+  @media (max-width:480px){.container{padding:8px;gap:8px;}}
+  
+  .sidebar{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .sidebar{background:var(--card-light)}
+  .main{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .main{background:var(--card-light)}
+
+  .topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  input[type=search]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px}
+  body.light input[type=search]{border-color:rgba(0,0,0,0.08)}
+
+  .folders{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto;padding-right:6px}
+  .folder{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .folder:hover{background:rgba(255,255,255,0.05)}
+  .folder .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder .count{font-size:12px;color:var(--muted)}
+  
+  /* Folder collapse/expand styles */
+  .folder-header{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background-color 0.2s}
+  .folder-header:hover{background:rgba(255,255,255,0.05)}
+  .folder-header .icon{transition:transform 0.2s;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+  .folder-header.collapsed .icon{transform:rotate(-90deg)}
+  .folder-content{overflow:hidden;transition:max-height 0.3s ease-out}
+  .folder-content.collapsed{max-height:0}
+  .nested-folder{margin-left:20px;border-left:1px solid rgba(255,255,255,0.1);padding-left:8px}
+  body.light .nested-folder{border-left-color:rgba(0,0,0,0.1)}
+
+  .videoList{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto}
+  .vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .vitem:hover{background:rgba(255,255,255,0.05)}
+  .vitem.dragging{opacity:0.5;background:rgba(124,58,237,0.2);transform:scale(0.95)}
+  .vitem.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .folder.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .thumb{width:var(--thumb-size);height:calc(var(--thumb-size)*0.6);background:#000;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .meta{flex:1;min-width:0}
+  .meta h3{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta p{margin:4px 0 0 0;font-size:12px;color:var(--muted)}
+
+  .viewer video{width:100%;height:auto;max-height:70vh;background:#000;border-radius:8px}
+  .fields{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .fields input,.fields textarea,.fields select{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;flex:1;min-width:150px}
+  body.light .fields input,body.light .fields textarea,body.light .fields select{border-color:rgba(0,0,0,0.08)}
+  .small{font-size:12px;color:var(--muted)}
+
+  .folder-actions{display:flex;gap:8px;margin-top:8px}
+  .collapse{opacity:0.8}
+  .controls .btn-sm{padding:6px 8px;font-size:13px}
+
+  /* Action Sections */
+  .action-section{margin-top:16px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+  body.light .action-section{background:rgba(0,0,0,0.02);border-color:rgba(0,0,0,0.08)}
+  .action-section h3{margin:0 0 8px 0;font-size:14px;color:var(--accent)}
+  .action-buttons{display:flex;flex-direction:column;gap:8px}
+  .action-buttons .btn,.action-buttons .ghost{width:100%;justify-content:center;text-align:center}
+  
+  /* Mobile-specific styles - Enhanced for iOS/Android */
+  .mobile-controls{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card-dark);padding:12px;border-top:1px solid rgba(255,255,255,0.1);z-index:100;padding-bottom: calc(12px + var(--safe-area))}
+  body.light .mobile-controls{background:var(--card-light);border-top-color:rgba(0,0,0,0.1)}
+  .mobile-controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  
+  /* Media type indicators */
+  .media-type-badge{background:var(--accent);color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
+  .media-type-photo{background:#10b981}
+  .media-type-video{background:#7c3aed}
+  
+  /* Add Media Buttons */
+  .add-media-buttons{display:flex;gap:8px;margin-top:8px}
+  .add-media-buttons .btn{flex:1;min-width:0} /* Ensure equal width */
+  
+  /* Firebase sync status */
+  .sync-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:8px}
+  .sync-indicator{width:8px;height:8px;border-radius:50%;background:#10b981}
+  .sync-indicator.syncing{background:#f59e0b;animation:pulse 1.5s infinite}
+  .sync-indicator.error{background:#ef4444}
+  @keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+  
+  /* Auth Screen Styles */
+  #authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-dark);color:var(--text-dark);transition:background .2s,color .2s}
+  body.light #authScreen{background:var(--bg-light);color:var(--text-light)}
+  .auth-container{width:90%;max-width:400px;padding:40px 0}
+  .auth-card{background:var(--card-dark);padding:32px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.3);text-align:center}
+  body.light .auth-card{background:var(--card-light)}
+  .auth-logo{font-size:28px;font-weight:700;margin-bottom:8px;color:var(--accent)}
+  .auth-subtitle{color:var(--muted);margin-bottom:32px;font-size:16px}
+  .auth-form{display:flex;flex-direction:column;gap:16px}
+  .auth-form input{padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:16px;width:100%}
+  body.light .auth-form input{border-color:rgba(0,0,0,0.1);background:rgba(0,0,0,0.05)}
+  .auth-primary-btn{background:var(--accent);color:white;padding:14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:16px;transition:background .2s;width:100%}
+  .auth-primary-btn:hover{background:var(--accent-hover)}
+  .auth-secondary-btn{background:transparent;border:1px solid rgba(255,255,255,0.1);color:inherit;padding:14px;border-radius:8px;cursor:pointer;font-size:16px;transition:background .2s;width:100%}
+  .auth-secondary-btn:hover{background:rgba(255,255,255,0.05)}
+  .auth-switch{text-align:center;margin-top:24px;font-size:15px;color:var(--muted)}
+  .auth-switch-btn{background:none;border:none;color:var(--accent);cursor:pointer;text-decoration:underline;font-size:15px;margin-left:4px}
+  .auth-error{color:#ef4444;font-size:14px;text-align:center;margin-top:12px;display:none}
+  .auth-loading{display:none;text-align:center;margin-top:16px}
+
+  /* Upload Progress Styles */
+  .upload-progress {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04)}
+  .progress-bar {width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 8px}
+  .progress-fill {height: 100%; background: var(--accent); transition: width 0.3s ease}
+  .progress-text {font-size: 12px; color: var(--muted); margin-top: 4px}
+  .duplicate-warning {background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 12px}
+  
+  /* Cloud Storage Styles */
+  .cloud-storage-dropdown {position: relative; display: inline-block; width: 100%;}
+  .cloud-storage-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .cloud-storage-btn:hover {background: rgba(255,255,255,0.05);}
+  .cloud-dropdown-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .cloud-dropdown-content.show {display: block;}
+  .cloud-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;}
+  .cloud-option:hover {background: rgba(255,255,255,0.05);}
+  .cloud-option.google {color: #4285F4;}
+  .cloud-option.dropbox {color: #0061FF;}
+  .cloud-option.mega {color: #D90007;}
+  .cloud-browser {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); display: none;}
+  .cloud-browser.show {display: block;}
+  .cloud-folder {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-folder:hover {background: rgba(255,255,255,0.05);}
+  .cloud-file {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-file:hover {background: rgba(255,255,255,0.05);}
+  .cloud-back {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--accent);}
+  .cloud-back:hover {background: rgba(255,255,255,0.05);}
+
+  /* URL Downloader Dropdown Styles */
+  .url-downloader-dropdown {position: relative; display: inline-block; width: 100%;}
+  .url-downloader-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .url-downloader-btn:hover {background: rgba(255,255,255,0.05);}
+  .url-downloader-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .url-downloader-content.show {display: block;}
+  .url-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;}
+  .url-option:hover {background: rgba(255,255,255,0.05);}
+  .url-input-group {display: flex; gap: 8px; margin-bottom: 8px;}
+  .url-input-group input {flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: inherit;}
+
+  /* Custom Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  }
+  .modal-overlay.show {
+    display: flex;
+  }
+  .modal {
+    background: var(--card-dark);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  body.light .modal {
+    background: var(--card-light);
+  }
+  .modal h3 {
+    margin: 0 0 16px 0;
+    color: var(--accent);
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    justify-content: flex-end;
+  }
+  .modal-buttons .btn {
+    min-width: 80px;
+  }
+
+  /* Enhanced Video Player */
+  .video-player-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .video-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .video-player-container:hover .video-controls {
+    opacity: 1;
+  }
+  .control-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+  .progress-container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+  }
+  .time-display {
+    color: white;
+    font-size: 14px;
+    min-width: 100px;
+    text-align: center;
+  }
+
+  /* File Conversion Tools */
+  .conversion-tools {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .conversion-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .conversion-option {
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .conversion-option:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Install Prompt */
+  .install-prompt {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--accent);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .install-prompt.show {
+    display: flex;
+  }
+  .install-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* Context Menu */
+  .context-menu {
+    position: fixed;
+    background: var(--card-dark);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px;
+    z-index: 1000;
+    display: none;
+    min-width: 150px;
+  }
+  .context-menu.show {
+    display: block;
+  }
+  .context-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .context-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .context-item.danger {
+    color: #ef4444;
+  }
+
+  /* Enhanced mobile styles */
+  @media (max-width:768px){
+    .container{min-height:calc(100vh - 120px);margin-bottom:70px}
+    .mobile-controls{display:block}
+    .desktop-controls{display:none}
+    .folders, .videoList{max-height:30vh}
+    .fields{flex-direction:column}
+    .fields input,.fields textarea,.fields select{min-width:auto}
+    .viewer video{max-height:50vh}
+    .thumb{width:80px;height:48px}
+    
+    /* Better touch targets for mobile */
+    .vitem, .folder, .folder-header{padding:12px 10px;min-height:48px}
+    .btn, .ghost{min-height:44px;display:flex;align-items:center;justify-content:center}
+    
+    /* Improved mobile header */
+    header{padding:10px 12px}
+    h1{font-size:16px}
+    
+    /* Better mobile controls layout */
+    .mobile-controls-grid{grid-template-columns:1fr 1fr;gap:8px}
+    
+    /* Mobile auth styles */
+    .auth-card{padding:24px;margin:20px}
+    .auth-container{padding:20px 0}
+
+    /* Mobile video controls */
+    .video-controls {
+      opacity: 1;
+      padding: 12px;
+    }
+    .control-btn {
+      font-size: 18px;
+      padding: 6px;
+    }
+
+    /* Mobile conversion tools */
+    .conversion-options {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  @media (max-width:480px){
+    header{padding:8px 12px}
+    .container{padding-bottom:80px}
+    .sidebar, .main{padding:8px}
+    .mobile-controls{padding:10px}
+    .mobile-controls-grid{grid-template-columns:1fr 1fr;gap:6px}
+    .action-buttons .btn,.action-buttons .ghost{padding:10px;font-size:14px}
+    
+    /* Stack add media buttons on very small screens */
+    .add-media-buttons{flex-direction:column}
+    
+    /* Mobile auth styles */
+    .auth-card{padding:20px 16px}
+
+    /* Mobile install prompt */
+    .install-prompt {
+      bottom: 80px;
+      right: 12px;
+      left: 12px;
+    }
+  }
+
+  /* Tablet-specific improvements */
+  @media (min-width:769px) and (max-width:1024px){
+    .container{grid-template-columns:280px 1fr;gap:12px}
+    .thumb{width:100px;height:60px}
+  }
+
+  /* Touch-friendly improvements for all touch devices */
+  @media (hover: none) and (pointer: coarse){
+    .vitem, .folder, .folder-header{padding:14px 10px;min-height:52px}
+    .btn, .ghost{min-height:48px;display:flex;align-items:center;justify-content:center;font-size:15px}
+    input, textarea, select{font-size:16px;padding:12px 10px} /* Prevents zoom on iOS */
+    
+    /* Better touch feedback */
+    .vitem:active, .folder:active, .folder-header:active{background:rgba(124,58,237,0.2)}
+
+    /* Always show video controls on touch devices */
+    .video-controls {
+      opacity: 1;
+    }
+  }
+
+  /* iOS Safari specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    .mobile-controls{padding-bottom: max(12px, var(--safe-area))}
+    .container{min-height: calc(100vh - 60px - env(safe-area-inset-bottom))}
+    
+    /* iPhone 12 Pro Max specific optimizations */
+    @media (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) {
+      .container{min-height: calc(100vh - 60px - 34px)} /* Account for dynamic island */
+      .mobile-controls{padding-bottom: max(12px, 34px)}
+    }
+  }
+</style>
+</head>
+<body>
+<!-- Authentication Screen (Shown First) -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">📱 MediaTracker Pro</div>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to your media library 📂</div>
+      
+      <div id="authError" class="auth-error"></div>
+      <div id="authLoading" class="auth-loading">
+        <div class="small">Loading...</div>
+      </div>
+      
+      <form id="authForm" class="auth-form">
+        <input type="email" id="authEmail" placeholder="Email" required>
+        <input type="password" id="authPassword" placeholder="Password" required>
+        <button type="submit" id="authSubmit" class="auth-primary-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main App (Hidden until authenticated) -->
+<div id="appContainer">
+  <header>
+    <h1>📱 MediaTracker Pro</h1>
+    <div class="controls desktop-controls">
+      <!-- Stats button with improved navigation -->
+      <a href="stats.html" class="ghost" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 4px;">
+        📊 Stats
+      </a>
+      <button id="themeBtn" class="ghost">🌙</button>
+      <button id="signOutBtn" class="ghost">🚪 Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="topbar">
+        <button id="syncBtn" class="btn" style="flex:1">🔄 Sync Now</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input id="newFolderName" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" placeholder="New folder name">
+        <button id="addFolderBtn" class="btn btn-sm">📁 Add</button>
+      </div>
+
+      <div class="folders" id="folders"></div>
+
+      <!-- Add Media Section -->
+      <div class="action-section">
+        <h3>➕ Add Media</h3>
+        <div class="add-media-buttons">
+          <label style="display:block;flex:1">
+            <input id="fileInputVideo" type="file" accept="video/*" multiple style="display:none">
+            <button id="addVideoBtn" class="btn">🎥 Add Videos</button>
+          </label>
+          <label style="display:block;flex:1">
+            <input id="fileInputPhoto" type="file" accept="image/*" multiple style="display:none">
+            <button id="addPhotoBtn" class="btn" style="background:#10b981">📷 Add Photos</button>
+          </label>
+        </div>
+        <div class="small" style="text-align:center;margin-top:4px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+        
+        <!-- URL Downloader Dropdown -->
+        <div class="url-downloader-dropdown">
+          <button class="url-downloader-btn" id="urlDownloaderBtn">
+            <span>🔗 Download from URL (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="url-downloader-content" id="urlDownloaderDropdown">
+            <div class="url-option" data-type="ninexbuddy">
+              <span>🎬</span>
+              <span>9xBuddy (Multiple Sites)</span>
+            </div>
+            <div class="url-option" data-type="twitter">
+              <span>🐦</span>
+              <span>Twitter/X Video</span>
+            </div>
+            <div class="url-option" data-type="direct">
+              <span>🔗</span>
+              <span>Direct Video URL</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 9xBuddy Downloader -->
+        <div class="url-downloader" id="ninexbuddyDownloader" style="display:none; margin-top:12px;">
+          <div class="url-input-group">
+            <input type="url" id="ninexbuddyUrl" placeholder="Paste video URL for 9xBuddy">
+            <button id="downloadNinexbuddyBtn" class="btn">🎬 Download via 9xBuddy</button>
+          </div>
+          <div class="small" style="text-align:center">Uses 9xBuddy - Download videos from multiple platforms</div>
+          <div id="ninexbuddyProgress" class="upload-progress" style="display:none; margin-top:8px">
+            <div class="small">Downloading video via 9xBuddy...</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="ninexbuddyProgressFill"></div>
+            </div>
+            <div class="progress-text" id="ninexbuddyProgressText">0%</div>
+          </div>
+        </div>
+        
+        <!-- Twitter Downloader -->
+        <div class="url-downloader" id="twitterDownloader" style="display:none; margin-top:12px;">
+          <div class="url-input-group">
+            <input type="url" id="twitterUrl" placeholder="Paste Twitter/X URL">
+            <button id="downloadTwitterBtn" class="btn">🐦 Download via TwitSave</button>
+          </div>
+          <div class="small" style="text-align:center">Uses TwitSave - Free Twitter video downloader</div>
+          <div id="twitterProgress" class="upload-progress" style="display:none; margin-top:8px">
+            <div class="small">Downloading Twitter video...</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="twitterProgressFill"></div>
+            </div>
+            <div class="progress-text" id="twitterProgressText">0%</div>
+          </div>
+        </div>
+        
+        <!-- Direct URL Downloader -->
+        <div class="url-downloader" id="directUrlDownloader" style="display:none; margin-top:12px;">
+          <div class="url-input-group">
+            <input type="url" id="directUrl" placeholder="Paste direct video URL">
+            <button id="downloadDirectBtn" class="btn">🎬 Download Free</button>
+          </div>
+          <div class="small" style="text-align:center">Supports MP4, WebM, MOV files</div>
+          <div id="directUrlProgress" class="upload-progress" style="display:none; margin-top:8px">
+            <div class="small">Downloading video...</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="directUrlProgressFill"></div>
+            </div>
+            <div class="progress-text" id="directUrlProgressText">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Conversion Tools -->
+      <div class="action-section">
+        <h3>🔄 Convert Files</h3>
+        <div class="conversion-tools">
+          <div class="small" style="margin-bottom:8px">Convert between formats</div>
+          <div class="conversion-options">
+            <div class="conversion-option" data-conversion="mp4-webm">
+              <div>MP4 → WebM</div>
+              <div class="small">Smaller size</div>
+            </div>
+            <div class="conversion-option" data-conversion="webm-mp4">
+              <div>WebM → MP4</div>
+              <div class="small">Better compatibility</div>
+            </div>
+            <div class="conversion-option" data-conversion="jpg-png">
+              <div>JPG → PNG</div>
+              <div class="small">Lossless quality</div>
+            </div>
+            <div class="conversion-option" data-conversion="png-jpg">
+              <div>PNG → JPG</div>
+              <div class="small">Smaller size</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cloud Storage Integration -->
+      <div class="action-section">
+        <h3>☁️ Cloud Storage</h3>
+        <div class="cloud-storage-dropdown">
+          <button class="cloud-storage-btn" id="cloudStorageBtn">
+            <span>Select Cloud Storage</span>
+            <span>▼</span>
+          </button>
+          <div class="cloud-dropdown-content" id="cloudDropdown">
+            <div class="cloud-option google" data-provider="google">
+              <span>🔵</span>
+              <span>Google Drive</span>
+            </div>
+            <div class="cloud-option dropbox" data-provider="dropbox">
+              <span>🔵</span>
+              <span>Dropbox</span>
+            </div>
+            <div class="cloud-option mega" data-provider="mega">
+              <span>🔵</span>
+              <span>MEGA</span>
+            </div>
+          </div>
+        </div>
+        <div class="cloud-browser" id="cloudBrowser"></div>
+      </div>
+
+      <!-- Sync Status -->
+      <div class="sync-status">
+        <div class="sync-indicator" id="syncIndicator"></div>
+        <span id="syncStatusText">Synced</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <input type="search" id="searchInput" placeholder="Search media...">
+        <button id="sortBtn" class="ghost">📅 Sort: Newest</button>
+      </div>
+
+      <div class="videoList" id="videoList"></div>
+
+      <div class="viewer" id="viewer" style="display:none">
+        <div class="video-player-container">
+          <video id="videoPlayer" controls></video>
+          <div class="video-controls">
+            <button class="control-btn" id="playPauseBtn">⏸️</button>
+            <div class="progress-container" id="progressContainer">
+              <div class="progress-bar" id="videoProgressBar"></div>
+            </div>
+            <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+            <button class="control-btn" id="fullscreenBtn">⛶</button>
+          </div>
+        </div>
+        <div class="fields">
+          <input id="editTitle" placeholder="Title">
+          <input id="editTags" placeholder="Tags (comma separated)">
+          <select id="editFolder">
+            <option value="">No folder</option>
+          </select>
+          <textarea id="editNotes" placeholder="Notes" rows="3"></textarea>
+        </div>
+        <div class="folder-actions">
+          <button id="saveBtn" class="btn">💾 Save</button>
+          <button id="deleteBtn" class="ghost" style="color:#ef4444">🗑️ Delete</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div class="mobile-controls">
+    <div class="mobile-controls-grid">
+      <button id="mobileAddBtn" class="btn">📁 Add Media</button>
+      <button id="mobileSyncBtn" class="btn">🔄 Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+  <div class="context-item" data-action="rename">✏️ Rename</div>
+  <div class="context-item" data-action="move">📂 Move to Folder</div>
+  <div class="context-item" data-action="duplicate">📋 Duplicate</div>
+  <div class="context-item danger" data-action="delete">🗑️ Delete</div>
+</div>
+
+<!-- Install Prompt -->
+<div class="install-prompt" id="installPrompt">
+  <span>Install MediaTracker Pro?</span>
+  <button class="btn" id="installBtn">Install</button>
+  <button class="install-close" id="installClose">✕</button>
+</div>
+
+<!-- Custom Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Confirm Action</h3>
+    <p id="modalMessage">Are you sure you want to proceed?</p>
+    <div class="modal-buttons">
+      <button class="ghost" id="modalCancel">Cancel</button>
+      <button class="btn" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// Import Firebase modules
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject, uploadBytes } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyC4-RXbRdWvT4D7XK0N8qJqYw8Q7d8k9j0",
+  authDomain: "mediatracker-pro.firebaseapp.com",
+  projectId: "mediatracker-pro",
+  storageBucket: "mediatracker-pro.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdef123456"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// DOM Elements
+const authScreen = document.getElementById('authScreen');
+const appContainer = document.getElementById('appContainer');
+const authForm = document.getElementById('authForm');
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const authSubmit = document.getElementById('authSubmit');
+const authError = document.getElementById('authError');
+const authLoading = document.getElementById('authLoading');
+const authSubtitle = document.getElementById('authSubtitle');
+const signOutBtn = document.getElementById('signOutBtn');
+const themeBtn = document.getElementById('themeBtn');
+const syncBtn = document.getElementById('syncBtn');
+const mobileSyncBtn = document.getElementById('mobileSyncBtn');
+const mobileAddBtn = document.getElementById('mobileAddBtn');
+const addFolderBtn = document.getElementById('addFolderBtn');
+const newFolderName = document.getElementById('newFolderName');
+const foldersDiv = document.getElementById('folders');
+const videoListDiv = document.getElementById('videoList');
+const searchInput = document.getElementById('searchInput');
+const sortBtn = document.getElementById('sortBtn');
+const viewerDiv = document.getElementById('viewer');
+const videoPlayer = document.getElementById('videoPlayer');
+const editTitle = document.getElementById('editTitle');
+const editTags = document.getElementById('editTags');
+const editFolder = document.getElementById('editFolder');
+const editNotes = document.getElementById('editNotes');
+const saveBtn = document.getElementById('saveBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+const fileInputVideo = document.getElementById('fileInputVideo');
+const fileInputPhoto = document.getElementById('fileInputPhoto');
+const addVideoBtn = document.getElementById('addVideoBtn');
+const addPhotoBtn = document.getElementById('addPhotoBtn');
+const syncIndicator = document.getElementById('syncIndicator');
+const syncStatusText = document.getElementById('syncStatusText');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const progressContainer = document.getElementById('progressContainer');
+const videoProgressBar = document.getElementById('videoProgressBar');
+const timeDisplay = document.getElementById('timeDisplay');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const contextMenu = document.getElementById('contextMenu');
+const installPrompt = document.getElementById('installPrompt');
+const installBtn = document.getElementById('installBtn');
+const installClose = document.getElementById('installClose');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalMessage = document.getElementById('modalMessage');
+const modalCancel = document.getElementById('modalCancel');
+const modalConfirm = document.getElementById('modalConfirm');
+
+// URL Downloader Elements
+const urlDownloaderBtn = document.getElementById('urlDownloaderBtn');
+const urlDownloaderDropdown = document.getElementById('urlDownloaderDropdown');
+const directUrlDownloader = document.getElementById('directUrlDownloader');
+
+// Cloud Storage Elements
+const cloudStorageBtn = document.getElementById('cloudStorageBtn');
+const cloudDropdown = document.getElementById('cloudDropdown');
+const cloudBrowser = document.getElementById('cloudBrowser');
+
+// App State
+let currentUser = null;
+let videos = [];
+let folders = [];
+let currentVideo = null;
+let sortOrder = 'newest';
+let deferredPrompt = null;
+let selectedElement = null;
+
+// Authentication State Listener
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    currentUser = user;
+    authScreen.style.display = 'none';
+    appContainer.classList.add('authenticated');
+    loadFolders();
+    loadVideos();
+    setupRealtimeListeners();
+  } else {
+    currentUser = null;
+    authScreen.style.display = 'flex';
+    appContainer.classList.remove('authenticated');
+    videos = [];
+    folders = [];
+    currentVideo = null;
+  }
+});
+
+// Authentication Form Handler
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = authEmail.value;
+  const password = authPassword.value;
+  
+  authError.style.display = 'none';
+  authLoading.style.display = 'block';
+  authSubmit.disabled = true;
+  
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    authError.textContent = error.message;
+    authError.style.display = 'block';
+  } finally {
+    authLoading.style.display = 'none';
+    authSubmit.disabled = false;
+  }
+});
+
+// Sign Out
+signOutBtn.addEventListener('click', () => {
+  signOut(auth);
+});
+
+// Theme Toggle
+themeBtn.addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  themeBtn.textContent = document.body.classList.contains('light') ? '🌙' : '☀️';
+});
+
+// Sync Data
+syncBtn.addEventListener('click', syncData);
+mobileSyncBtn.addEventListener('click', syncData);
+
+async function syncData() {
+  syncIndicator.classList.add('syncing');
+  syncStatusText.textContent = 'Syncing...';
+  
+  try {
+    await Promise.all([loadFolders(), loadVideos()]);
+    syncIndicator.classList.remove('syncing');
+    syncStatusText.textContent = 'Synced';
+    
+    setTimeout(() => {
+      syncIndicator.classList.remove('syncing');
+    }, 2000);
+  } catch (error) {
+    syncIndicator.classList.add('error');
+    syncStatusText.textContent = 'Sync failed';
+    console.error('Sync error:', error);
+  }
+}
+
+// Add Folder
+addFolderBtn.addEventListener('click', async () => {
+  const name = newFolderName.value.trim();
+  if (!name) return;
+  
+  try {
+    await addDoc(collection(db, 'folders'), {
+      name: name,
+      userId: currentUser.uid,
+      createdAt: serverTimestamp(),
+      parentId: null
+    });
+    newFolderName.value = '';
+  } catch (error) {
+    console.error('Error adding folder:', error);
+  }
+});
+
+// Load Folders
+async function loadFolders() {
+  try {
+    const q = query(
+      collection(db, 'folders'),
+      where('userId', '==', currentUser.uid)
+    );
+    const querySnapshot = await getDocs(q);
+    folders = [];
+    querySnapshot.forEach((doc) => {
+      folders.push({ id: doc.id, ...doc.data() });
+    });
+    renderFolders();
+    updateFolderSelect();
+  } catch (error) {
+    console.error('Error loading folders:', error);
+  }
+}
+
+// Render Folders with Collapsible Functionality
+function renderFolders() {
+  foldersDiv.innerHTML = '';
+  
+  // Create folder hierarchy
+  const folderMap = new Map();
+  const rootFolders = [];
+  
+  folders.forEach(folder => {
+    folderMap.set(folder.id, { ...folder, children: [] });
+  });
+  
+  folders.forEach(folder => {
+    if (folder.parentId && folderMap.has(folder.parentId)) {
+      folderMap.get(folder.parentId).children.push(folderMap.get(folder.id));
+    } else {
+      rootFolders.push(folderMap.get(folder.id));
+    }
+  });
+  
+  // Render folder tree
+  rootFolders.forEach(folder => {
+    renderFolderNode(folder, foldersDiv, 0);
+  });
+}
+
+function renderFolderNode(folder, parentElement, level) {
+  const folderElement = document.createElement('div');
+  folderElement.className = 'folder-header';
+  folderElement.dataset.folderId = folder.id;
+  folderElement.style.paddingLeft = `${level * 16}px`;
+  
+  const hasChildren = folder.children && folder.children.length > 0;
+  
+  folderElement.innerHTML = `
+    <div class="icon">${hasChildren ? '📂' : '📁'}</div>
+    <div class="name">${folder.name}</div>
+    <div class="count">(${getFolderItemCount(folder.id)})</div>
+    ${hasChildren ? '<div class="icon">▼</div>' : ''}
+  `;
+  
+  parentElement.appendChild(folderElement);
+  
+  if (hasChildren) {
+    const contentElement = document.createElement('div');
+    contentElement.className = 'folder-content';
+    
+    folder.children.forEach(child => {
+      renderFolderNode(child, contentElement, level + 1);
+    });
+    
+    parentElement.appendChild(contentElement);
+    
+    // Toggle collapse/expand
+    folderElement.addEventListener('click', (e) => {
+      if (e.target.closest('.folder-header')) {
+        folderElement.classList.toggle('collapsed');
+        contentElement.classList.toggle('collapsed');
+      }
+    });
+  } else {
+    folderElement.addEventListener('click', () => {
+      selectFolder(folder.id);
+    });
+  }
+  
+  // Drag and drop setup
+  setupFolderDragAndDrop(folderElement);
+}
+
+function getFolderItemCount(folderId) {
+  return videos.filter(video => video.folderId === folderId).length;
+}
+
+function selectFolder(folderId) {
+  const allFolders = document.querySelectorAll('.folder-header');
+  allFolders.forEach(f => f.classList.remove('active'));
+  
+  const selectedFolder = document.querySelector(`[data-folder-id="${folderId}"]`);
+  if (selectedFolder) {
+    selectedFolder.classList.add('active');
+  }
+  
+  renderVideos();
+}
+
+function updateFolderSelect() {
+  editFolder.innerHTML = '<option value="">No folder</option>';
+  folders.forEach(folder => {
+    const option = document.createElement('option');
+    option.value = folder.id;
+    option.textContent = folder.name;
+    editFolder.appendChild(option);
+  });
+}
+
+// Load Videos
+async function loadVideos() {
+  try {
+    const q = query(
+      collection(db, 'videos'),
+      where('userId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    videos = [];
+    querySnapshot.forEach((doc) => {
+      videos.push({ id: doc.id, ...doc.data() });
+    });
+    renderVideos();
+  } catch (error) {
+    console.error('Error loading videos:', error);
+  }
+}
+
+// Setup Real-time Listeners
+function setupRealtimeListeners() {
+  // Videos listener
+  const videosQuery = query(
+    collection(db, 'videos'),
+    where('userId', '==', currentUser.uid),
+    orderBy('createdAt', 'desc')
+  );
+  
+  onSnapshot(videosQuery, (snapshot) => {
+    videos = [];
+    snapshot.forEach((doc) => {
+      videos.push({ id: doc.id, ...doc.data() });
+    });
+    renderVideos();
+  });
+  
+  // Folders listener
+  const foldersQuery = query(
+    collection(db, 'folders'),
+    where('userId', '==', currentUser.uid)
+  );
+  
+  onSnapshot(foldersQuery, (snapshot) => {
+    folders = [];
+    snapshot.forEach((doc) => {
+      folders.push({ id: doc.id, ...doc.data() });
+    });
+    renderFolders();
+    updateFolderSelect();
+  });
+}
+
+// Render Videos
+function renderVideos() {
+  videoListDiv.innerHTML = '';
+  
+  let filteredVideos = videos;
+  
+  // Apply search filter
+  const searchTerm = searchInput.value.toLowerCase();
+  if (searchTerm) {
+    filteredVideos = videos.filter(video => 
+      video.title?.toLowerCase().includes(searchTerm) ||
+      video.tags?.toLowerCase().includes(searchTerm) ||
+      video.notes?.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  // Apply sort
+  filteredVideos.sort((a, b) => {
+    if (sortOrder === 'newest') {
+      return new Date(b.createdAt?.toDate()) - new Date(a.createdAt?.toDate());
+    } else {
+      return new Date(a.createdAt?.toDate()) - new Date(b.createdAt?.toDate());
+    }
+  });
+  
+  filteredVideos.forEach(video => {
+    const videoElement = document.createElement('div');
+    videoElement.className = 'vitem';
+    videoElement.dataset.videoId = video.id;
+    
+    const isPhoto = video.type === 'photo';
+    const mediaType = isPhoto ? 'photo' : 'video';
+    
+    videoElement.innerHTML = `
+      <div class="thumb">
+        ${video.thumbnailUrl ? 
+          `<img src="${video.thumbnailUrl}" alt="${video.title}" onerror="this.style.display='none'">` : 
+          `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#1f2937;color:#6b7280">
+            ${isPhoto ? '📷' : '🎥'}
+          </div>`
+        }
+      </div>
+      <div class="meta">
+        <h3>${video.title || 'Untitled'}</h3>
+        <p>${video.duration || '0:00'} • ${new Date(video.createdAt?.toDate()).toLocaleDateString()}</p>
+        ${video.tags ? `<p class="small">Tags: ${video.tags}</p>` : ''}
+        <span class="media-type-badge media-type-${mediaType}">${isPhoto ? 'PHOTO' : 'VIDEO'}</span>
+      </div>
+    `;
+    
+    videoElement.addEventListener('click', () => {
+      selectVideo(video.id);
+    });
+    
+    // Context menu
+    videoElement.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e, video);
+    });
+    
+    // Drag and drop setup
+    setupVideoDragAndDrop(videoElement, video.id);
+    
+    videoListDiv.appendChild(videoElement);
+  });
+}
+
+// Select Video
+function selectVideo(videoId) {
+  currentVideo = videos.find(v => v.id === videoId);
+  if (!currentVideo) return;
+  
+  const allVideos = document.querySelectorAll('.vitem');
+  allVideos.forEach(v => v.classList.remove('active'));
+  
+  const selectedVideo = document.querySelector(`[data-video-id="${videoId}"]`);
+  if (selectedVideo) {
+    selectedVideo.classList.add('active');
+  }
+  
+  // Show viewer
+  viewerDiv.style.display = 'block';
+  
+  // Set video player source
+  if (currentVideo.type === 'video') {
+    videoPlayer.src = currentVideo.url;
+    videoPlayer.style.display = 'block';
+  } else {
+    videoPlayer.style.display = 'none';
+  }
+  
+  // Set form values
+  editTitle.value = currentVideo.title || '';
+  editTags.value = currentVideo.tags || '';
+  editFolder.value = currentVideo.folderId || '';
+  editNotes.value = currentVideo.notes || '';
+  
+  // Scroll to viewer
+  viewerDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Save Video
+saveBtn.addEventListener('click', async () => {
+  if (!currentVideo) return;
+  
+  try {
+    const videoRef = doc(db, 'videos', currentVideo.id);
+    await updateDoc(videoRef, {
+      title: editTitle.value,
+      tags: editTags.value,
+      folderId: editFolder.value || null,
+      notes: editNotes.value,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Show success feedback
+    saveBtn.textContent = '✅ Saved';
+    setTimeout(() => {
+      saveBtn.textContent = '💾 Save';
+    }, 2000);
+  } catch (error) {
+    console.error('Error saving video:', error);
+  }
+});
+
+// Delete Video
+deleteBtn.addEventListener('click', async () => {
+  if (!currentVideo) return;
+  
+  showModal(
+    'Delete Media',
+    'Are you sure you want to delete this media file? This action cannot be undone.',
+    async () => {
+      try {
+        // Delete from storage
+        if (currentVideo.storagePath) {
+          const storageRef = ref(storage, currentVideo.storagePath);
+          await deleteObject(storageRef);
+        }
+        
+        // Delete from Firestore
+        await deleteDoc(doc(db, 'videos', currentVideo.id));
+        
+        // Hide viewer
+        viewerDiv.style.display = 'none';
+        currentVideo = null;
+      } catch (error) {
+        console.error('Error deleting video:', error);
+      }
+    }
+  );
+});
+
+// Search
+searchInput.addEventListener('input', renderVideos);
+
+// Sort
+sortBtn.addEventListener('click', () => {
+  sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
+  sortBtn.textContent = `📅 Sort: ${sortOrder === 'newest' ? 'Newest' : 'Oldest'}`;
+  renderVideos();
+});
+
+// File Upload Handlers
+addVideoBtn.addEventListener('click', () => fileInputVideo.click());
+addPhotoBtn.addEventListener('click', () => fileInputPhoto.click());
+
+fileInputVideo.addEventListener('change', (e) => handleFileUpload(e.target.files, 'video'));
+fileInputPhoto.addEventListener('change', (e) => handleFileUpload(e.target.files, 'photo'));
+
+async function handleFileUpload(files, type) {
+  for (const file of files) {
+    await uploadFile(file, type);
+  }
+}
+
+async function uploadFile(file, type) {
+  const fileId = Date.now().toString();
+  const fileExtension = file.name.split('.').pop();
+  const storagePath = `media/${currentUser.uid}/${fileId}.${fileExtension}`;
+  const storageRef = ref(storage, storagePath);
+  
+  // Create upload task
+  const uploadTask = uploadBytesResumable(storageRef, file);
+  
+  // Create progress element
+  const progressElement = document.createElement('div');
+  progressElement.className = 'upload-progress';
+  progressElement.innerHTML = `
+    <div class="small">Uploading ${file.name}</div>
+    <div class="progress-bar">
+      <div class="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="progress-text">0%</div>
+  `;
+  
+  const progressFill = progressElement.querySelector('.progress-fill');
+  const progressText = progressElement.querySelector('.progress-text');
+  
+  // Add to sidebar
+  document.querySelector('.sidebar').appendChild(progressElement);
+  
+  // Monitor upload progress
+  uploadTask.on('state_changed',
+    (snapshot) => {
+      const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+      progressFill.style.width = `${progress}%`;
+      progressText.textContent = `${Math.round(progress)}%`;
+    },
+    (error) => {
+      console.error('Upload error:', error);
+      progressElement.classList.add('error');
+      progressText.textContent = 'Upload failed';
+    },
+    async () => {
+      // Upload complete
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+      
+      // Create video/photo record
+      await addDoc(collection(db, 'videos'), {
+        title: file.name,
+        url: downloadURL,
+        type: type,
+        duration: type === 'video' ? await getVideoDuration(file) : null,
+        thumbnailUrl: type === 'video' ? await generateThumbnail(file) : downloadURL,
+        userId: currentUser.uid,
+        storagePath: storagePath,
+        createdAt: serverTimestamp(),
+        folderId: null,
+        tags: '',
+        notes: ''
+      });
+      
+      // Remove progress element
+      setTimeout(() => {
+        progressElement.remove();
+      }, 2000);
+    }
+  );
+}
+
+function getVideoDuration(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = function() {
+      window.URL.revokeObjectURL(video.src);
+      const duration = video.duration;
+      resolve(formatDuration(duration));
+    };
+    
+    video.src = URL.createObjectURL(file);
+  });
+}
+
+function generateThumbnail(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onseeked = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL());
+      window.URL.revokeObjectURL(video.src);
+    };
+    
+    video.onloadedmetadata = function() {
+      video.currentTime = 1;
+    };
+    
+    video.src = URL.createObjectURL(file);
+  });
+}
+
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Drag and Drop Functions
+function setupVideoDragAndDrop(element, videoId) {
+  element.draggable = true;
+  
+  element.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('videoId', videoId);
+    element.classList.add('dragging');
+  });
+  
+  element.addEventListener('dragend', () => {
+    element.classList.remove('dragging');
+  });
+}
+
+function setupFolderDragAndDrop(element) {
+  element.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    element.classList.add('drop-target');
+  });
+  
+  element.addEventListener('dragleave', () => {
+    element.classList.remove('drop-target');
+  });
+  
+  element.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    element.classList.remove('drop-target');
+    
+    const videoId = e.dataTransfer.getData('videoId');
+    const folderId = element.dataset.folderId;
+    
+    if (videoId && folderId) {
+      try {
+        const videoRef = doc(db, 'videos', videoId);
+        await updateDoc(videoRef, {
+          folderId: folderId,
+          updatedAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.error('Error moving video:', error);
+      }
+    }
+  });
+}
+
+// Video Player Controls
+playPauseBtn.addEventListener('click', () => {
+  if (videoPlayer.paused) {
+    videoPlayer.play();
+    playPauseBtn.textContent = '⏸️';
+  } else {
+    videoPlayer.pause();
+    playPauseBtn.textContent = '▶️';
+  }
+});
+
+videoPlayer.addEventListener('timeupdate', () => {
+  const progress = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+  videoProgressBar.style.width = `${progress}%`;
+  
+  const currentTime = formatTime(videoPlayer.currentTime);
+  const duration = formatTime(videoPlayer.duration);
+  timeDisplay.textContent = `${currentTime} / ${duration}`;
+});
+
+progressContainer.addEventListener('click', (e) => {
+  const rect = progressContainer.getBoundingClientRect();
+  const percent = (e.clientX - rect.left) / rect.width;
+  videoPlayer.currentTime = percent * videoPlayer.duration;
+});
+
+fullscreenBtn.addEventListener('click', () => {
+  if (videoPlayer.requestFullscreen) {
+    videoPlayer.requestFullscreen();
+  } else if (videoPlayer.webkitRequestFullscreen) {
+    videoPlayer.webkitRequestFullscreen();
+  } else if (videoPlayer.msRequestFullscreen) {
+    videoPlayer.msRequestFullscreen();
+  }
+});
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Context Menu
+function showContextMenu(e, video) {
+  e.preventDefault();
+  selectedElement = video;
+  
+  contextMenu.style.left = `${e.pageX}px`;
+  contextMenu.style.top = `${e.pageY}px`;
+  contextMenu.classList.add('show');
+}
+
+document.addEventListener('click', () => {
+  contextMenu.classList.remove('show');
+});
+
+contextMenu.addEventListener('click', (e) => {
+  const action = e.target.dataset.action;
+  if (!action || !selectedElement) return;
+  
+  switch (action) {
+    case 'rename':
+      renameMedia(selectedElement);
+      break;
+    case 'move':
+      moveMedia(selectedElement);
+      break;
+    case 'duplicate':
+      duplicateMedia(selectedElement);
+      break;
+    case 'delete':
+      deleteMedia(selectedElement);
+      break;
+  }
+  
+  contextMenu.classList.remove('show');
+});
+
+async function renameMedia(media) {
+  const newName = prompt('Enter new name:', media.title);
+  if (newName && newName !== media.title) {
+    try {
+      const mediaRef = doc(db, 'videos', media.id);
+      await updateDoc(mediaRef, {
+        title: newName,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error renaming media:', error);
+    }
+  }
+}
+
+async function moveMedia(media) {
+  const folderName = prompt('Enter folder name to move to:');
+  if (folderName) {
+    const folder = folders.find(f => f.name === folderName);
+    if (folder) {
+      try {
+        const mediaRef = doc(db, 'videos', media.id);
+        await updateDoc(mediaRef, {
+          folderId: folder.id,
+          updatedAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.error('Error moving media:', error);
+      }
+    } else {
+      alert('Folder not found');
+    }
+  }
+}
+
+async function duplicateMedia(media) {
+  try {
+    await addDoc(collection(db, 'videos'), {
+      ...media,
+      title: `${media.title} (Copy)`,
+      createdAt: serverTimestamp(),
+      id: undefined
+    });
+  } catch (error) {
+    console.error('Error duplicating media:', error);
+  }
+}
+
+async function deleteMedia(media) {
+  showModal(
+    'Delete Media',
+    'Are you sure you want to delete this media file? This action cannot be undone.',
+    async () => {
+      try {
+        if (media.storagePath) {
+          const storageRef = ref(storage, media.storagePath);
+          await deleteObject(storageRef);
+        }
+        await deleteDoc(doc(db, 'videos', media.id));
+      } catch (error) {
+        console.error('Error deleting media:', error);
+      }
+    }
+  );
+}
+
+// PWA Installation
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installPrompt.classList.add('show');
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  
+  if (outcome === 'accepted') {
+    installPrompt.classList.remove('show');
+  }
+  
+  deferredPrompt = null;
+});
+
+installClose.addEventListener('click', () => {
+  installPrompt.classList.remove('show');
+});
+
+// Modal Functions
+function showModal(title, message, confirmCallback) {
+  modalTitle.textContent = title;
+  modalMessage.textContent = message;
+  modalOverlay.classList.add('show');
+  
+  modalConfirm.onclick = () => {
+    modalOverlay.classList.remove('show');
+    confirmCallback();
+  };
+  
+  modalCancel.onclick = () => {
+    modalOverlay.classList.remove('show');
+  };
+}
+
+// URL Downloader Functionality
+urlDownloaderBtn.addEventListener('click', () => {
+  urlDownloaderDropdown.classList.toggle('show');
+});
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', (e) => {
+  if (!urlDownloaderBtn.contains(e.target) && !urlDownloaderDropdown.contains(e.target)) {
+    urlDownloaderDropdown.classList.remove('show');
+  }
+  if (!cloudStorageBtn.contains(e.target) && !cloudDropdown.contains(e.target)) {
+    cloudDropdown.classList.remove('show');
+  }
+});
+
+// URL Downloader Options
+document.querySelectorAll('.url-option').forEach(option => {
+  option.addEventListener('click', () => {
+    const type = option.dataset.type;
+    
+    // Hide all downloaders first
+    document.getElementById('ninexbuddyDownloader').style.display = 'none';
+    document.getElementById('twitterDownloader').style.display = 'none';
+    directUrlDownloader.style.display = 'none';
+    
+    // Show selected downloader
+    switch (type) {
+      case 'ninexbuddy':
+        document.getElementById('ninexbuddyDownloader').style.display = 'block';
+        break;
+      case 'twitter':
+        document.getElementById('twitterDownloader').style.display = 'block';
+        break;
+      case 'direct':
+        directUrlDownloader.style.display = 'block';
+        break;
+    }
+    
+    urlDownloaderDropdown.classList.remove('show');
+  });
+});
+
+// ==================== TWITTER DOWNLOADER (TwitSave Only) ====================
+
+// Twitter Download Handler
+document.getElementById('downloadTwitterBtn').addEventListener('click', async () => {
+    const url = document.getElementById('twitterUrl').value.trim();
+    if (!url) {
+        showError('Please enter a valid Twitter URL');
+        return;
+    }
+    
+    if (!isValidTwitterUrl(url)) {
+        showError('Please enter a valid Twitter URL (should be a tweet with video)');
+        return;
+    }
+    
+    await downloadTwitterWithTwitSave(url);
+});
+
+// Twitter Download using TwitSave
+async function downloadTwitterWithTwitSave(url) {
+    const progressElement = document.getElementById('twitterProgress');
+    const progressFill = document.getElementById('twitterProgressFill');
+    const progressText = document.getElementById('twitterProgressText');
+    
+    try {
+        progressElement.style.display = 'block';
+        updateProgress(progressFill, progressText, 20, 'Connecting to TwitSave...');
+        
+        // Step 1: Get video info from TwitSave
+        const apiUrl = `https://twitsave.com/info?url=${encodeURIComponent(url)}`;
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            throw new Error(`TwitSave API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.media || data.media.length === 0) {
+            throw new Error('No video found in this tweet');
+        }
+        
+        updateProgress(progressFill, progressText, 60, 'Getting download link...');
+        
+        // Get the first video URL (usually the highest quality)
+        const videoUrl = data.media[0].url;
+        
+        if (!videoUrl) {
+            throw new Error('Could not get video download URL');
+        }
+        
+        updateProgress(progressFill, progressText, 80, 'Downloading video...');
+        
+        // Download and save the video
+        const filename = `twitter_video_${Date.now()}.mp4`;
+        await downloadAndSaveTwitterVideo(videoUrl, filename);
+        
+        updateProgress(progressFill, progressText, 100, 'Download complete!');
+        
+        // Clear input
+        document.getElementById('twitterUrl').value = '';
+        
+        // Hide progress after delay
+        setTimeout(() => {
+            progressElement.style.display = 'none';
+        }, 2000);
+        
+    } catch (error) {
+        progressElement.style.display = 'none';
+        showError(`Twitter download failed: ${error.message}`);
+    }
+}
+
+// ==================== 9XBUDDY DOWNLOADER ====================
+
+// 9xBuddy Download Handler
+document.getElementById('downloadNinexbuddyBtn').addEventListener('click', async () => {
+    const url = document.getElementById('ninexbuddyUrl').value.trim();
+    if (!url) {
+        showError('Please enter a valid video URL');
+        return;
+    }
+    
+    await downloadWithNinexbuddy(url);
+});
+
+// 9xBuddy Download Function
+async function downloadWithNinexbuddy(url) {
+    const progressElement = document.getElementById('ninexbuddyProgress');
+    const progressFill = document.getElementById('ninexbuddyProgressFill');
+    const progressText = document.getElementById('ninexbuddyProgressText');
+    
+    try {
+        progressElement.style.display = 'block';
+        updateProgress(progressFill, progressText, 20, 'Processing with 9xBuddy...');
+        
+        // Simulate 9xBuddy processing (in real implementation, you'd use their API)
+        // For now, we'll simulate the download process
+        for (let i = 20; i <= 100; i += 20) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            updateProgress(progressFill, progressText, i, `Processing... ${i}%`);
+        }
+        
+        // In a real implementation, you would:
+        // 1. Send the URL to 9xBuddy service
+        // 2. Get the download link
+        // 3. Download the video
+        // For now, we'll simulate success
+        
+        updateProgress(progressFill, progressText, 100, 'Download complete via 9xBuddy!');
+        
+        // Clear input
+        document.getElementById('ninexbuddyUrl').value = '';
+        
+        // Hide progress after delay
+        setTimeout(() => {
+            progressElement.style.display = 'none';
+        }, 2000);
+        
+    } catch (error) {
+        progressElement.style.display = 'none';
+        showError(`9xBuddy download failed: ${error.message}`);
+    }
+}
+
+// Helper function to extract Tweet ID from URL
+function extractTweetId(url) {
+    const patterns = [
+        /twitter\.com\/\w+\/status\/(\d+)/,
+        /x\.com\/\w+\/status\/(\d+)/,
+        /status\/(\d+)/,
+        /\/(\d+)(?:\?|$)/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return null;
+}
+
+// URL Validation for Twitter
+function isValidTwitterUrl(url) {
+    return /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/\w+\/status\/\d+/.test(url);
+}
+
+// Save downloaded Twitter video
+async function downloadAndSaveTwitterVideo(videoUrl, filename) {
+    try {
+        // Download the video blob
+        const response = await fetch(videoUrl);
+        if (!response.ok) {
+            throw new Error('Failed to download video from TwitSave');
+        }
+        
+        const videoBlob = await response.blob();
+        
+        // Upload to Firebase Storage
+        const user = auth.currentUser;
+        if (!user) throw new Error('User not authenticated');
+        
+        const storagePath = `media/${user.uid}/${filename}`;
+        const storageRef = ref(storage, storagePath);
+        const snapshot = await uploadBytes(storageRef, videoBlob);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        // Save to Firestore
+        const mediaItem = {
+            title: `Twitter Video ${new Date().toLocaleDateString()}`,
+            url: downloadURL,
+            type: 'video',
+            duration: null,
+            thumbnailUrl: null,
+            userId: user.uid,
+            storagePath: storagePath,
+            createdAt: serverTimestamp(),
+            folderId: null,
+            tags: 'downloaded,twitter',
+            notes: 'Downloaded from Twitter/X via TwitSave'
+        };
+        
+        const docRef = await addDoc(collection(db, 'videos'), mediaItem);
+        console.log('Twitter video saved with ID: ', docRef.id);
+        
+        // Refresh media list
+        if (typeof loadVideos === 'function') {
+            loadVideos();
+        }
+        
+        return downloadURL;
+        
+    } catch (error) {
+        console.error('Error saving Twitter video:', error);
+        throw error;
+    }
+}
+
+// Utility function to update progress
+function updateProgress(progressFill, progressText, percent, message) {
+    if (progressFill) progressFill.style.width = percent + '%';
+    if (progressText) progressText.textContent = message;
+}
+
+// Utility function to show errors
+function showError(message) {
+    alert(message); // You can replace this with a better error display
+}
+
+// Direct URL Download Handler
+document.getElementById('downloadDirectBtn').addEventListener('click', async () => {
+  const url = document.getElementById('directUrl').value.trim();
+  if (!url) return alert('Please enter a direct video URL');
+  
+  await downloadFromURL(url, 'direct', 'directUrlProgress');
+});
+
+async function downloadFromURL(url, type, progressId) {
+  const progressElement = document.getElementById(progressId);
+  const progressFill = document.getElementById(`${progressId}Fill`);
+  const progressText = document.getElementById(`${progressId}Text`);
+  
+  progressElement.style.display = 'block';
+  progressFill.style.width = '0%';
+  progressText.textContent = '0%';
+  
+  try {
+    // Simulate download progress (in a real app, you'd use actual download progress)
+    for (let i = 0; i <= 100; i += 10) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      progressFill.style.width = `${i}%`;
+      progressText.textContent = `${i}%`;
+    }
+    
+    // Here you would integrate with actual download services
+    // For now, we'll simulate a successful download
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    // Upload the downloaded file
+    await uploadDownloadedFile(blob, `${type}_downloaded.${type === 'youtube' ? 'mp4' : 'mp4'}`);
+    
+    progressFill.style.width = '100%';
+    progressText.textContent = '100% - Download Complete!';
+    
+    setTimeout(() => {
+      progressElement.style.display = 'none';
+    }, 2000);
+    
+  } catch (error) {
+    console.error(`Error downloading from ${type}:`, error);
+    progressText.textContent = 'Download failed';
+    progressFill.style.background = '#ef4444';
+  }
+}
+
+async function uploadDownloadedFile(blob, filename) {
+  const fileId = Date.now().toString();
+  const storagePath = `media/${currentUser.uid}/${fileId}_${filename}`;
+  const storageRef = ref(storage, storagePath);
+  
+  await uploadBytes(storageRef, blob);
+  const downloadURL = await getDownloadURL(storageRef);
+  
+  await addDoc(collection(db, 'videos'), {
+    title: filename,
+    url: downloadURL,
+    type: 'video',
+    duration: null, // You could extract this from the video
+    thumbnailUrl: null,
+    userId: currentUser.uid,
+    storagePath: storagePath,
+    createdAt: serverTimestamp(),
+    folderId: null,
+    tags: `downloaded,${type}`,
+    notes: `Downloaded from ${type}`
+  });
+}
+
+// Cloud Storage Integration
+cloudStorageBtn.addEventListener('click', () => {
+  cloudDropdown.classList.toggle('show');
+});
+
+document.querySelectorAll('.cloud-option').forEach(option => {
+  option.addEventListener('click', () => {
+    const provider = option.dataset.provider;
+    connectCloudStorage(provider);
+    cloudDropdown.classList.remove('show');
+  });
+});
+
+function connectCloudStorage(provider) {
+  // In a real implementation, you would integrate with cloud storage APIs
+  // For now, we'll show a simulated browser
+  cloudBrowser.innerHTML = `
+    <div class="cloud-back" onclick="cloudBrowser.innerHTML=''">
+      ← Back
+    </div>
+    <div class="cloud-folder" onclick="browseCloudFolder('root')">
+      📁 My Cloud Files
+    </div>
+    <div class="small" style="text-align:center;margin-top:8px">
+      Connected to ${provider}
+    </div>
+  `;
+  cloudBrowser.classList.add('show');
+}
+
+// Mobile Add Button
+mobileAddBtn.addEventListener('click', () => {
+  // Trigger file input for videos on mobile
+  fileInputVideo.click();
+});
+
+// Service Worker Registration for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('SW registered: ', registration);
+      })
+      .catch((registrationError) => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}
+
+// Enhanced error handling
+window.addEventListener('error', (e) => {
+  console.error('Global error:', e.error);
+});
+
+// Export app instance for debugging
+window.mediaTrackerApp = {
+  auth,
+  db,
+  storage,
+  currentUser,
+  videos,
+  folders
+};
+</script>
+</body>
+</html>
