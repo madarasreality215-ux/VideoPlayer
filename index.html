@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaTracker Pro - Your Ultimate Media Organizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MediaTracker">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+<style>
+  :root{
+    --bg-light:#f3f4f6;
+    --bg-dark:#0b1220;
+    --card-light:#ffffff;
+    --card-dark:#0f1724;
+    --text-light:#0f1724;
+    --text-dark:#e6eef9;
+    --accent:#7c3aed;
+    --accent-hover:#6d28d9;
+    --muted:rgba(230,238,249,0.65);
+    --thumb-size:120px;
+    --safe-area: env(safe-area-inset-bottom, 16px);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;background:var(--bg-dark);color:var(--text-dark);transition:background .2s,color .2s}
+  body.light{background:var(--bg-light);color:var(--text-light)}
+  
+  /* App container - hidden until authenticated */
+  #appContainer{display:none}
+  #appContainer.authenticated{display:block}
+  
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card-dark);position:sticky;top:0;z-index:100;}
+  body.light header{background:var(--card-light)}
+  h1{margin:0;font-size:18px}
+  .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:white;padding:8px 10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;transition:background .2s}
+  .btn:hover{background:var(--accent-hover)}
+  .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit;cursor:pointer;transition:background .2s}
+  .ghost:hover{background:rgba(255,255,255,0.05)}
+  body.light .ghost{border-color:rgba(0,0,0,0.08)}
+  body.light .ghost:hover{background:rgba(0,0,0,0.05)}
+  
+  .container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  @media (max-width:960px){.container{grid-template-columns:1fr;}}
+  @media (max-width:768px){.container{padding:12px;gap:12px;}}
+  @media (max-width:480px){.container{padding:8px;gap:8px;}}
+  
+  .sidebar{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .sidebar{background:var(--card-light)}
+  .main{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .main{background:var(--card-light)}
+
+  .topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  input[type=search]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px}
+  body.light input[type=search]{border-color:rgba(0,0,0,0.08)}
+
+  .folders{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto;padding-right:6px}
+  .folder{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .folder:hover{background:rgba(255,255,255,0.05)}
+  .folder .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder .count{font-size:12px;color:var(--muted)}
+  
+  /* Folder collapse/expand styles */
+  .folder-header{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background-color 0.2s}
+  .folder-header:hover{background:rgba(255,255,255,0.05)}
+  .folder-header .icon{transition:transform 0.2s;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+  .folder-header.collapsed .icon{transform:rotate(-90deg)}
+  .folder-content{overflow:hidden;transition:max-height 0.3s ease-out}
+  .folder-content.collapsed{max-height:0}
+  .nested-folder{margin-left:20px;border-left:1px solid rgba(255,255,255,0.1);padding-left:8px}
+  body.light .nested-folder{border-left-color:rgba(0,0,0,0.1)}
+
+  .videoList{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto}
+  .vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .vitem:hover{background:rgba(255,255,255,0.05)}
+  .vitem.dragging{opacity:0.5;background:rgba(124,58,237,0.2);transform:scale(0.95)}
+  .vitem.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .folder.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .thumb{width:var(--thumb-size);height:calc(var(--thumb-size)*0.6);background:#000;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .meta{flex:1;min-width:0}
+  .meta h3{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta p{margin:4px 0 0 0;font-size:12px;color:var(--muted)}
+
+  .viewer video{width:100%;height:auto;max-height:70vh;background:#000;border-radius:8px}
+  .fields{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .fields input,.fields textarea,.fields select{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;flex:1;min-width:150px}
+  body.light .fields input,body.light .fields textarea,body.light .fields select{border-color:rgba(0,0,0,0.08)}
+  .small{font-size:12px;color:var(--muted)}
+
+  .folder-actions{display:flex;gap:8px;margin-top:8px}
+  .collapse{opacity:0.8}
+  .controls .btn-sm{padding:6px 8px;font-size:13px}
+
+  /* Action Sections */
+  .action-section{margin-top:16px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+  body.light .action-section{background:rgba(0,0,0,0.02);border-color:rgba(0,0,0,0.08)}
+  .action-section h3{margin:0 0 8px 0;font-size:14px;color:var(--accent)}
+  .action-buttons{display:flex;flex-direction:column;gap:8px}
+  .action-buttons .btn,.action-buttons .ghost{width:100%;justify-content:center;text-align:center}
+  
+  /* Mobile-specific styles - Enhanced for iOS/Android */
+  .mobile-controls{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card-dark);padding:12px;border-top:1px solid rgba(255,255,255,0.1);z-index:100;padding-bottom: calc(12px + var(--safe-area))}
+  body.light .mobile-controls{background:var(--card-light);border-top-color:rgba(0,0,0,0.1)}
+  .mobile-controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  
+  /* Media type indicators */
+  .media-type-badge{background:var(--accent);color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
+  .media-type-photo{background:#10b981}
+  .media-type-video{background:#7c3aed}
+  
+  /* Add Media Buttons */
+  .add-media-buttons{display:flex;gap:8px;margin-top:8px}
+  .add-media-buttons .btn{flex:1;min-width:0} /* Ensure equal width */
+  
+  /* Firebase sync status */
+  .sync-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:8px}
+  .sync-indicator{width:8px;height:8px;border-radius:50%;background:#10b981}
+  .sync-indicator.syncing{background:#f59e0b;animation:pulse 1.5s infinite}
+  .sync-indicator.error{background:#ef4444}
+  @keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+  
+  /* Auth Screen Styles */
+  #authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-dark);color:var(--text-dark);transition:background .2s,color .2s}
+  body.light #authScreen{background:var(--bg-light);color:var(--text-light)}
+  .auth-container{width:90%;max-width:400px;padding:40px 0}
+  .auth-card{background:var(--card-dark);padding:32px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.3);text-align:center}
+  body.light .auth-card{background:var(--card-light)}
+  .auth-logo{font-size:28px;font-weight:700;margin-bottom:8px;color:var(--accent)}
+  .auth-subtitle{color:var(--muted);margin-bottom:32px;font-size:16px}
+  .auth-form{display:flex;flex-direction:column;gap:16px}
+  .auth-form input{padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:16px;width:100%}
+  body.light .auth-form input{border-color:rgba(0,0,0,0.1);background:rgba(0,0,0,0.05)}
+  .auth-primary-btn{background:var(--accent);color:white;padding:14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:16px;transition:background .2s;width:100%}
+  .auth-primary-btn:hover{background:var(--accent-hover)}
+  .auth-secondary-btn{background:transparent;border:1px solid rgba(255,255,255,0.1);color:inherit;padding:14px;border-radius:8px;cursor:pointer;font-size:16px;transition:background .2s;width:100%}
+  .auth-secondary-btn:hover{background:rgba(255,255,255,0.05)}
+  .auth-switch{text-align:center;margin-top:24px;font-size:15px;color:var(--muted)}
+  .auth-switch-btn{background:none;border:none;color:var(--accent);cursor:pointer;text-decoration:underline;font-size:15px;margin-left:4px}
+  .auth-error{color:#ef4444;font-size:14px;text-align:center;margin-top:12px;display:none}
+  .auth-loading{display:none;text-align:center;margin-top:16px}
+
+  /* Upload Progress Styles */
+  .upload-progress {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04)}
+  .progress-bar {width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 8px}
+  .progress-fill {height: 100%; background: var(--accent); transition: width 0.3s ease}
+  .progress-text {font-size: 12px; color: var(--muted); margin-top: 4px}
+  .duplicate-warning {background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 12px}
+  
+  /* Cloud Storage Styles */
+  .cloud-storage-dropdown {position: relative; display: inline-block; width: 100%;}
+  .cloud-storage-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .cloud-storage-btn:hover {background: rgba(255,255,255,0.05);}
+  .cloud-dropdown-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .cloud-dropdown-content.show {display: block;}
+  .cloud-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;}
+  .cloud-option:hover {background: rgba(255,255,255,0.05);}
+  .cloud-option.google {color: #4285F4;}
+  .cloud-option.dropbox {color: #0061FF;}
+  .cloud-option.mega {color: #D90007;}
+  .cloud-browser {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); display: none;}
+  .cloud-browser.show {display: block;}
+  .cloud-folder {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-folder:hover {background: rgba(255,255,255,0.05);}
+  .cloud-file {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-file:hover {background: rgba(255,255,255,0.05);}
+  .cloud-back {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--accent);}
+  .cloud-back:hover {background: rgba(255,255,255,0.05);}
+
+  /* URL Downloader Dropdown Styles */
+  .url-downloader-dropdown {position: relative; display: inline-block; width: 100%;}
+  .url-downloader-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .url-downloader-btn:hover {background: rgba(255,255,255,0.05);}
+  .url-downloader-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .url-downloader-content.show {display: block;}
+  .url-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;}
+  .url-option:hover {background: rgba(255,255,255,0.05);}
+  .url-input-group {display: flex; gap: 8px; margin-bottom: 8px;}
+  .url-input-group input {flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: inherit;}
+
+  /* File Tools Dropdown Styles */
+  .file-tools-dropdown {position: relative; display: inline-block; width: 100%;}
+  .file-tools-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .file-tools-btn:hover {background: rgba(255,255,255,0.05);}
+  .file-tools-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .file-tools-content.show {display: block;}
+  .file-tool-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition:background 0.2s;}
+  .file-tool-option:hover {background: rgba(255,255,255,0.05);}
+
+  /* Custom Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  }
+  .modal-overlay.show {
+    display: flex;
+  }
+  .modal {
+    background: var(--card-dark);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  body.light .modal {
+    background: var(--card-light);
+  }
+  .modal h3 {
+    margin: 0 0 16px 0;
+    color: var(--accent);
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    justify-content: flex-end;
+  }
+  .modal-buttons .btn {
+    min-width: 80px;
+  }
+
+  /* Enhanced Video Player */
+  .video-player-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .video-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .video-player-container:hover .video-controls {
+    opacity: 1;
+  }
+  .control-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+  .progress-container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+  }
+  .time-display {
+    color: white;
+    font-size: 14px;
+    min-width: 100px;
+    text-align: center;
+  }
+
+  /* File Conversion Tools */
+  .conversion-tools {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .conversion-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .conversion-option {
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .conversion-option:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Install Prompt */
+  .install-prompt {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--accent);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .install-prompt.show {
+    display: flex;
+  }
+  .install-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* Context Menu */
+  .context-menu {
+    position: fixed;
+    background: var(--card-dark);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px;
+    z-index: 1000;
+    display: none;
+    min-width: 150px;
+  }
+  .context-menu.show {
+    display: block;
+  }
+  .context-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .context-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .context-item.danger {
+    color: #ef4444;
+  }
+
+  /* Video Popup Overlay - Google Drive Style */
+  .video-popup {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  /* When visible */
+  .video-popup.show {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* Popup content area */
+  .video-popup-content {
+    position: relative;
+    background: #000;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 90%;
+    max-height: 85%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+  }
+
+  /* Scale up slightly when visible */
+  .video-popup.show .video-popup-content {
+    transform: scale(1);
+  }
+
+  /* Video inside popup */
+  .video-popup-content video {
+    width: 100%;
+    height: auto;
+    max-height: 85vh;
+    border-radius: 10px;
+  }
+
+  /* Close button */
+  .close-popup {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    color: #fff;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 10000;
+  }
+
+  .close-popup:hover {
+    color: #bbb;
+  }
+
+  /* Enhanced mobile styles */
+  @media (max-width:768px){
+    .container{min-height:calc(100vh - 120px);margin-bottom:70px}
+    .mobile-controls{display:block}
+    .desktop-controls{display:none}
+    .folders, .videoList{max-height:30vh}
+    .fields{flex-direction:column}
+    .fields input,.fields textarea,.fields select{min-width:auto}
+    .viewer video{max-height:50vh}
+    .thumb{width:80px;height:48px}
+    
+    /* Better touch targets for mobile */
+    .vitem, .folder, .folder-header{padding:12px 10px;min-height:48px}
+    .btn, .ghost{min-height:44px;display:flex;align-items:center;justify-content:center}
+    
+    /* Improved mobile header */
+    header{padding:10px 12px}
+    h1{font-size:16px}
+    
+    /* Better mobile controls layout */
+    .mobile-controls-grid{grid-template-columns:1fr 1fr;gap:8px}
+    
+    /* Mobile auth styles */
+    .auth-card{padding:24px;margin:20px}
+    .auth-container{padding:20px 0}
+
+    /* Mobile video controls */
+    .video-controls {
+      opacity: 1;
+      padding: 12px;
+    }
+    .control-btn {
+      font-size: 18px;
+      padding: 6px;
+    }
+
+    /* Mobile conversion tools */
+    .conversion-options {
+      grid-template-columns: 1fr;
+    }
+
+    /* Mobile popup adjustments */
+    .video-popup-content {
+      max-width: 95%;
+      max-height: 80%;
+    }
+    .close-popup {
+      top: 5px;
+      right: 15px;
+      font-size: 24px;
+    }
+  }
+  
+  @media (max-width:480px){
+    header{padding:8px 12px}
+    .container{padding-bottom:80px}
+    .sidebar, .main{padding:8px}
+    .mobile-controls{padding:10px}
+    .mobile-controls-grid{grid-template-columns:1fr 1fr;gap:6px}
+    .action-buttons .btn,.action-buttons .ghost{padding:10px;font-size:14px}
+    
+    /* Stack add media buttons on very small screens */
+    .add-media-buttons{flex-direction:column}
+    
+    /* Mobile auth styles */
+    .auth-card{padding:20px 16px}
+
+    /* Mobile install prompt */
+    .install-prompt {
+      bottom: 80px;
+      right: 12px;
+      left: 12px;
+    }
+
+    /* Mobile popup adjustments */
+    .video-popup-content {
+      max-width: 98%;
+      max-height: 75%;
+    }
+  }
+
+  /* Tablet-specific improvements */
+  @media (min-width:769px) and (max-width:1024px){
+    .container{grid-template-columns:280px 1fr;gap:12px}
+    .thumb{width:100px;height:60px}
+  }
+
+  /* Touch-friendly improvements for all touch devices */
+  @media (hover: none) and (pointer: coarse){
+    .vitem, .folder, .folder-header{padding:14px 10px;min-height:52px}
+    .btn, .ghost{min-height:48px;display:flex;align-items:center;justify-content:center;font-size:15px}
+    input, textarea, select{font-size:16px;padding:12px 10px} /* Prevents zoom on iOS */
+    
+    /* Better touch feedback */
+    .vitem:active, .folder:active, .folder-header:active{background:rgba(124,58,237,0.2)}
+
+    /* Always show video controls on touch devices */
+    .video-controls {
+      opacity: 1;
+    }
+  }
+
+  /* iOS Safari specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    .mobile-controls{padding-bottom: max(12px, var(--safe-area))}
+    .container{min-height: calc(100vh - 60px - env(safe-area-inset-bottom))}
+    
+    /* iPhone 12 Pro Max specific optimizations */
+    @media (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) {
+      .container{min-height: calc(100vh - 60px - 34px)} /* Account for dynamic island */
+      .mobile-controls{padding-bottom: max(12px, 34px)}
+    }
+  }
+</style>
+</head>
+<body>
+<!-- Authentication Screen (Shown First) -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">📱 MediaTracker Pro</div>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to your media library 📂</div>
+      
+      <div id="authError" class="auth-error"></div>
+      <div id="authLoading" class="auth-loading">
+        <div class="small">Loading...</div>
+      </div>
+      
+      <form id="authForm" class="auth-form">
+        <input type="email" id="authEmail" placeholder="Email" required>
+        <input type="password" id="authPassword" placeholder="Password" required>
+        <button type="submit" id="authSubmit" class="auth-primary-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main App (Hidden until authenticated) -->
+<div id="appContainer">
+  <header>
+    <h1>📱 MediaTracker Pro</h1>
+    <div class="controls desktop-controls">
+      <!-- Stats button moved next to Sign Out -->
+      <a href="stats.html" class="ghost" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 4px;">
+        📊 Stats
+      </a>
+      <!-- Theme button removed as requested -->
+      <button id="signOutBtn" class="ghost">🚪 Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="topbar">
+        <button id="syncBtn" class="btn" style="flex:1">🔄 Sync Now</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input id="newFolderName" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" placeholder="New folder name">
+        <button id="addFolderBtn" class="btn btn-sm">📁 Add</button>
+      </div>
+
+      <div class="folders" id="folders">
+        <!-- No placeholder folders - will be empty initially -->
+      </div>
+
+      <!-- Add Media Section -->
+      <div class="action-section">
+        <h3>➕ Add Media</h3>
+        <div class="add-media-buttons">
+          <label style="display:block;flex:1">
+            <input id="fileInputVideo" type="file" accept="video/*" multiple style="display:none">
+            <button id="addVideoBtn" class="btn">🎥 Add Videos</button>
+          </label>
+          <label style="display:block;flex:1">
+            <input id="fileInputPhoto" type="file" accept="image/*" multiple style="display:none">
+            <button id="addPhotoBtn" class="btn" style="background:#10b981">📷 Add Photos</button>
+          </label>
+        </div>
+        <div class="small" style="text-align:center;margin-top:4px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+        
+        <!-- URL Downloader Dropdown -->
+        <div class="url-downloader-dropdown">
+          <button class="url-downloader-btn" id="urlDownloaderBtn">
+            <span>🔗 Download from URL (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="url-downloader-content" id="urlDownloaderDropdown">
+            <div class="url-option" data-type="ninexbuddy">
+              <span>🎬</span>
+              <span>9xBuddy (Multiple Sites)</span>
+            </div>
+            <div class="url-option" data-type="y2mate">
+              <span>📹</span>
+              <span>Y2Mate (YouTube)</span>
+            </div>
+            <div class="url-option" data-type="savetube">
+              <span>📺</span>
+              <span>SaveTube (YouTube)</span>
+            </div>
+            <div class="url-input-group">
+              <input type="url" id="videoUrl" placeholder="Paste video URL here">
+              <button class="btn" id="downloadUrlBtn">Download</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cloud Storage Dropdown -->
+        <div class="cloud-storage-dropdown">
+          <button class="cloud-storage-btn" id="cloudStorageBtn">
+            <span>☁️ Cloud Storage (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="cloud-dropdown-content" id="cloudStorageDropdown">
+            <div class="cloud-option google" data-provider="google">
+              <span>🔵</span>
+              <span>Google Drive</span>
+            </div>
+            <div class="cloud-option dropbox" data-provider="dropbox">
+              <span>🔵</span>
+              <span>Dropbox</span>
+            </div>
+            <div class="cloud-option mega" data-provider="mega">
+              <span>🔵</span>
+              <span>MEGA</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- File Tools Dropdown -->
+        <div class="file-tools-dropdown">
+          <button class="file-tools-btn" id="fileToolsBtn">
+            <span>🛠️ File Tools (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="file-tools-content" id="fileToolsDropdown">
+            <div class="file-tool-option" data-tool="rename">
+              <span>📝</span>
+              <span>Rename Files</span>
+            </div>
+            <div class="file-tool-option" data-tool="convert">
+              <span>🔄</span>
+              <span>Convert Format</span>
+            </div>
+            <div class="file-tool-option" data-tool="compress">
+              <span>🗜️</span>
+              <span>Compress Video</span>
+            </div>
+            <div class="file-tool-option" data-tool="extract">
+              <span>🎵</span>
+              <span>Extract Audio</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sync Status -->
+      <div class="sync-status">
+        <div class="sync-indicator" id="syncIndicator"></div>
+        <span id="syncStatusText">Ready to sync</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <input type="search" id="searchInput" placeholder="🔍 Search videos...">
+        <button id="sortBtn" class="ghost">📅 Sort: Newest</button>
+      </div>
+      <div class="videoList" id="videoList">
+        <!-- Videos will be populated here -->
+      </div>
+      <div class="viewer" id="viewer" style="display:none">
+        <!-- Video player will be shown here -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div class="mobile-controls">
+    <div class="mobile-controls-grid">
+      <button id="mobileSyncBtn" class="btn">🔄 Sync</button>
+      <button id="mobileAddBtn" class="btn">➕ Add Media</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Popup Overlay -->
+<div class="video-popup" id="videoPopup">
+  <div class="close-popup" id="closePopup">&times;</div>
+  <div class="video-popup-content">
+    <video id="popupVideo" controls>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+
+<script>
+  // Firebase configuration
+  <script>
+  // Firebase configuration - REPLACE WITH YOUR VALID CONFIG
+  const firebaseConfig = {
+    apiKey: "AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+    authDomain: "personalplayer-c8d3b.firebaseapp.com",
+    projectId: "personalplayer-c8d3b",
+    storageBucket: "personalplayer-c8d3b.firebasestorage.app",
+    messagingSenderId: "396785312809",
+    appId: "1:396785312809:web:02290950ec22a13165a838",
+    measurementId: "G-2Q8W3GJF1S"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  // DOM elements
+  const authScreen = document.getElementById('authScreen');
+  const appContainer = document.getElementById('appContainer');
+  const authForm = document.getElementById('authForm');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
+  const authSubmit = document.getElementById('authSubmit');
+  const authError = document.getElementById('authError');
+  const authLoading = document.getElementById('authLoading');
+  const authSubtitle = document.getElementById('authSubtitle');
+  const signOutBtn = document.getElementById('signOutBtn');
+  const syncBtn = document.getElementById('syncBtn');
+  const mobileSyncBtn = document.getElementById('mobileSyncBtn');
+  const mobileAddBtn = document.getElementById('mobileAddBtn');
+  const folders = document.getElementById('folders');
+  const videoList = document.getElementById('videoList');
+  const viewer = document.getElementById('viewer');
+  const searchInput = document.getElementById('searchInput');
+  const sortBtn = document.getElementById('sortBtn');
+  const newFolderName = document.getElementById('newFolderName');
+  const addFolderBtn = document.getElementById('addFolderBtn');
+  const fileInputVideo = document.getElementById('fileInputVideo');
+  const fileInputPhoto = document.getElementById('fileInputPhoto');
+  const addVideoBtn = document.getElementById('addVideoBtn');
+  const addPhotoBtn = document.getElementById('addPhotoBtn');
+  const syncIndicator = document.getElementById('syncIndicator');
+  const syncStatusText = document.getElementById('syncStatusText');
+
+  // Video Popup Elements
+  const videoPopup = document.getElementById('videoPopup');
+  const popupVideo = document.getElementById('popupVideo');
+  const closePopup = document.getElementById('closePopup');
+
+  // Cloud Storage Elements
+  const cloudStorageBtn = document.getElementById('cloudStorageBtn');
+  const cloudStorageDropdown = document.getElementById('cloudStorageDropdown');
+  const urlDownloaderBtn = document.getElementById('urlDownloaderBtn');
+  const urlDownloaderDropdown = document.getElementById('urlDownloaderDropdown');
+  const fileToolsBtn = document.getElementById('fileToolsBtn');
+  const fileToolsDropdown = document.getElementById('fileToolsDropdown');
+
+  // App state
+  let currentUser = null;
+  let foldersData = {};
+  let videosData = {};
+  let currentFolder = null;
+  let currentVideo = null;
+  let sortOrder = 'newest';
+
+  // Initialize app
+  function initApp() {
+    // Auth state observer
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUser = user;
+        showApp();
+        loadUserData();
+      } else {
+        showAuth();
+      }
+    });
+
+    // Event listeners
+    authForm.addEventListener('submit', handleAuth);
+    signOutBtn.addEventListener('click', signOut);
+    syncBtn.addEventListener('click', syncData);
+    mobileSyncBtn.addEventListener('click', syncData);
+    mobileAddBtn.addEventListener('click', () => fileInputVideo.click());
+    searchInput.addEventListener('input', filterVideos);
+    sortBtn.addEventListener('click', toggleSort);
+    addFolderBtn.addEventListener('click', addFolder);
+    newFolderName.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addFolder();
+    });
+    
+    // File input handlers
+    fileInputVideo.addEventListener('change', handleFileUpload);
+    fileInputPhoto.addEventListener('change', handleFileUpload);
+    addVideoBtn.addEventListener('click', () => fileInputVideo.click());
+    addPhotoBtn.addEventListener('click', () => fileInputPhoto.click());
+
+    // Cloud storage dropdown
+    cloudStorageBtn.addEventListener('click', toggleCloudStorageDropdown);
+    urlDownloaderBtn.addEventListener('click', toggleUrlDownloaderDropdown);
+    fileToolsBtn.addEventListener('click', toggleFileToolsDropdown);
+
+    // Video popup handlers
+    closePopup.addEventListener('click', closeVideoPopup);
+    videoPopup.addEventListener('click', (e) => {
+      if (e.target === videoPopup) {
+        closeVideoPopup();
+      }
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!cloudStorageBtn.contains(e.target) && !cloudStorageDropdown.contains(e.target)) {
+        cloudStorageDropdown.classList.remove('show');
+      }
+      if (!urlDownloaderBtn.contains(e.target) && !urlDownloaderDropdown.contains(e.target)) {
+        urlDownloaderDropdown.classList.remove('show');
+      }
+      if (!fileToolsBtn.contains(e.target) && !fileToolsDropdown.contains(e.target)) {
+        fileToolsDropdown.classList.remove('show');
+      }
+    });
+
+    // Cloud storage option handlers
+    document.querySelectorAll('.cloud-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const provider = option.dataset.provider;
+        showCloudBrowser(provider);
+      });
+    });
+
+    // URL downloader option handlers
+    document.querySelectorAll('.url-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const type = option.dataset.type;
+        showUrlDownloader(type);
+      });
+    });
+
+    // File tools option handlers
+    document.querySelectorAll('.file-tool-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const tool = option.dataset.tool;
+        showFileTool(tool);
+      });
+    });
+
+    // Download URL button
+    document.getElementById('downloadUrlBtn').addEventListener('click', downloadFromUrl);
+  }
+
+  // Auth functions
+  function handleAuth(e) {
+    e.preventDefault();
+    const email = authEmail.value;
+    const password = authPassword.value;
+    
+    showAuthLoading(true);
+    authError.style.display = 'none';
+    
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        // Success - auth state change will handle the rest
+      })
+      .catch((error) => {
+        showAuthError(error.message);
+      })
+      .finally(() => {
+        showAuthLoading(false);
+      });
+  }
+
+  function signOut() {
+    auth.signOut();
+  }
+
+  function showAuth() {
+    authScreen.style.display = 'flex';
+    appContainer.classList.remove('authenticated');
+    authEmail.value = '';
+    authPassword.value = '';
+    authError.style.display = 'none';
+  }
+
+  function showApp() {
+    authScreen.style.display = 'none';
+    appContainer.classList.add('authenticated');
+  }
+
+  function showAuthError(message) {
+    authError.textContent = message;
+    authError.style.display = 'block';
+  }
+
+  function showAuthLoading(show) {
+    authLoading.style.display = show ? 'block' : 'none';
+    authSubmit.disabled = show;
+  }
+
+  // Data management
+  function loadUserData() {
+    if (!currentUser) return;
+    
+    // Load folders
+    db.collection('users').doc(currentUser.uid).collection('folders')
+      .onSnapshot((snapshot) => {
+        foldersData = {};
+        snapshot.forEach((doc) => {
+          foldersData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderFolders();
+      });
+
+    // Load videos
+    db.collection('users').doc(currentUser.uid).collection('videos')
+      .onSnapshot((snapshot) => {
+        videosData = {};
+        snapshot.forEach((doc) => {
+          videosData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderVideos();
+      });
+  }
+
+  function syncData() {
+    updateSyncStatus('syncing', 'Syncing...');
+    // Simulate sync delay
+    setTimeout(() => {
+      updateSyncStatus('synced', 'Synced just now');
+      setTimeout(() => {
+        updateSyncStatus('ready', 'Ready to sync');
+      }, 2000);
+    }, 1000);
+  }
+
+  function updateSyncStatus(status, text) {
+    syncIndicator.className = 'sync-indicator ' + status;
+    syncStatusText.textContent = text;
+  }
+
+  // Folder functions
+  function addFolder() {
+    const name = newFolderName.value.trim();
+    if (!name) return;
+    
+    if (!currentUser) return;
+    
+    db.collection('users').doc(currentUser.uid).collection('folders').add({
+      name: name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      itemCount: 0
+    }).then(() => {
+      newFolderName.value = '';
+    }).catch((error) => {
+      console.error('Error adding folder:', error);
+    });
+  }
+
+  function renderFolders() {
+    folders.innerHTML = '';
+    
+    // Convert folders object to array and sort by creation date
+    const foldersArray = Object.values(foldersData).sort((a, b) => 
+      (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0)
+    );
+    
+    foldersArray.forEach(folder => {
+      const folderElement = document.createElement('div');
+      folderElement.className = 'folder';
+      folderElement.innerHTML = `
+        <div class="name">${folder.name}</div>
+        <div class="count">${folder.itemCount || 0}</div>
+      `;
+      
+      folderElement.addEventListener('click', () => selectFolder(folder.id));
+      folders.appendChild(folderElement);
+    });
+  }
+
+  function selectFolder(folderId) {
+    currentFolder = folderId;
+    renderVideos();
+    
+    // Update active state
+    document.querySelectorAll('.folder').forEach(f => f.classList.remove('active'));
+    document.querySelector(`.folder[data-folder-id="${folderId}"]`)?.classList.add('active');
+  }
+
+  // Video functions
+  function renderVideos() {
+    videoList.innerHTML = '';
+    
+    if (Object.keys(videosData).length === 0) {
+      videoList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No media yet. Add some videos or photos to get started!</div>';
+      return;
+    }
+    
+    // Filter and sort videos
+    let videosArray = Object.values(videosData);
+    
+    // Filter by current folder if selected
+    if (currentFolder) {
+      videosArray = videosArray.filter(video => video.folderId === currentFolder);
+    }
+    
+    // Filter by search
+    const searchTerm = searchInput.value.toLowerCase();
+    if (searchTerm) {
+      videosArray = videosArray.filter(video => 
+        video.name.toLowerCase().includes(searchTerm) ||
+        (video.tags && video.tags.some(tag => tag.toLowerCase().includes(searchTerm)))
+      );
+    }
+    
+    // Sort videos
+    videosArray.sort((a, b) => {
+      if (sortOrder === 'newest') {
+        return (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0);
+      } else {
+        return (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0);
+      }
+    });
+    
+    // Render videos
+    videosArray.forEach(video => {
+      const videoElement = document.createElement('div');
+      videoElement.className = 'vitem';
+      videoElement.innerHTML = `
+        <div class="thumb">
+          ${video.thumbnailUrl ? `<img src="${video.thumbnailUrl}" alt="${video.name}">` : '📹'}
+        </div>
+        <div class="meta">
+          <h3>${video.name}</h3>
+          <p>${formatFileSize(video.size)} • ${video.duration || '0:00'} • ${formatDate(video.createdAt?.toDate())}</p>
+          <div class="small">
+            ${video.tags ? video.tags.map(tag => `#${tag}`).join(' ') : ''}
+          </div>
+        </div>
+        <div class="media-type-badge ${video.type === 'photo' ? 'media-type-photo' : 'media-type-video'}">
+          ${video.type === 'photo' ? '📷' : '🎥'}
+        </div>
+      `;
+      
+      videoElement.addEventListener('click', () => playVideo(video));
+      videoList.appendChild(videoElement);
+    });
+  }
+
+  function playVideo(video) {
+    // Use the popup system for videos
+    if (video.type === 'video') {
+      openVideoPopup(video);
+    } else {
+      // For photos, we could implement a lightbox system
+      alert(`Photo viewing would open for: ${video.name}`);
+    }
+  }
+
+  // Video Popup Functions
+  function openVideoPopup(video) {
+    popupVideo.src = video.url;
+    popupVideo.poster = video.thumbnailUrl || '';
+    videoPopup.classList.add('show');
+    
+    // Prevent body scroll when popup is open
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeVideoPopup() {
+    videoPopup.classList.remove('show');
+    popupVideo.pause();
+    popupVideo.src = '';
+    
+    // Restore body scroll
+    document.body.style.overflow = '';
+  }
+
+  function filterVideos() {
+    renderVideos();
+  }
+
+  function toggleSort() {
+    sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
+    sortBtn.textContent = `📅 Sort: ${sortOrder === 'newest' ? 'Newest' : 'Oldest'}`;
+    renderVideos();
+  }
+
+  // File upload
+  function handleFileUpload(e) {
+    const files = Array.from(e.target.files);
+    const isPhoto = e.target === fileInputPhoto;
+    
+    files.forEach(file => {
+      uploadFile(file, isPhoto ? 'photo' : 'video');
+    });
+    
+    // Reset file input
+    e.target.value = '';
+  }
+
+  function uploadFile(file, type) {
+    if (!currentUser) return;
+    
+    const fileId = Date.now().toString();
+    const filePath = `users/${currentUser.uid}/${type}s/${fileId}_${file.name}`;
+    const uploadTask = storage.ref(filePath).put(file);
+    
+    // Create initial video record
+    const videoData = {
+      name: file.name,
+      size: file.size,
+      type: type,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      folderId: currentFolder,
+      uploadProgress: 0
+    };
+    
+    db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).set(videoData);
+    
+    // Monitor upload progress
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).update({
+          uploadProgress: progress
+        });
+      },
+      (error) => {
+        console.error('Upload error:', error);
+      },
+      () => {
+        // Upload completed
+        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+          db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).update({
+            url: downloadURL,
+            uploadProgress: 100
+          });
+          
+          // For videos, we could generate a thumbnail here
+          if (type === 'video') {
+            // Thumbnail generation would go here
+          }
+        });
+      }
+    );
+  }
+
+  // Utility functions
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function formatDate(date) {
+    if (!date) return 'Unknown date';
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  }
+
+  // Cloud Storage Functions
+  function toggleCloudStorageDropdown() {
+    cloudStorageDropdown.classList.toggle('show');
+  }
+
+  function toggleUrlDownloaderDropdown() {
+    urlDownloaderDropdown.classList.toggle('show');
+  }
+
+  function toggleFileToolsDropdown() {
+    fileToolsDropdown.classList.toggle('show');
+  }
+
+  function showCloudBrowser(provider) {
+    alert(`Cloud browser for ${provider} would open here. This is a premium feature.`);
+    // Implementation would go here for actual cloud storage integration
+  }
+
+  function showUrlDownloader(type) {
+    alert(`URL downloader for ${type} would open here. This is a premium feature.`);
+    // Implementation would go here for actual URL downloading
+  }
+
+  function showFileTool(tool) {
+    alert(`File tool ${tool} would open here. This is a premium feature.`);
+    // Implementation would go here for actual file tools
+  }
+
+  function downloadFromUrl() {
+    const url = document.getElementById('videoUrl').value;
+    if (!url) {
+      alert('Please enter a video URL');
+      return;
+    }
+    alert(`Downloading from URL: ${url}. This is a premium feature.`);
+    // Implementation would go here for actual URL downloading
+  }
+
+  // Initialize the app when DOM is loaded
+  document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>
