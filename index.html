@@ -1,0 +1,2005 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaTracker Pro - Your Ultimate Media Organizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MediaTracker">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+<style>
+  :root{
+    --bg-light:#f3f4f6;
+    --bg-dark:#0b1220;
+    --card-light:#ffffff;
+    --card-dark:#0f1724;
+    --text-light:#0f1724;
+    --text-dark:#e6eef9;
+    --accent:#7c3aed;
+    --accent-hover:#6d28d9;
+    --muted:rgba(230,238,249,0.65);
+    --root-folder-color: #10b981; /* New color for root folder */
+    --root-folder-hover: #34d399; /* Hover color for root folder */
+    --thumb-size:120px;
+    --safe-area: env(safe-area-inset-bottom, 16px);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;background:var(--bg-dark);color:var(--text-dark);transition:background .2s,color .2s}
+  body.light{background:var(--bg-light);color:var(--text-light)}
+  
+  /* App container - COMPLETELY HIDDEN until authenticated */
+  #appContainer{
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  #appContainer.authenticated{
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Auth Screen Styles - ALWAYS SHOWN initially */
+  #authScreen{
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    color: var(--text-dark);
+    transition: background .2s, color .2s;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+  }
+  body.light #authScreen{
+    background: var(--bg-light);
+    color: var(--text-light);
+  }
+  
+  /* Hide auth screen when authenticated */
+  #authScreen.authenticated{
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  .auth-container{
+    width: 90%;
+    max-width: 400px;
+    padding: 40px 0;
+  }
+  .auth-card{
+    background: var(--card-dark);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  body.light .auth-card{
+    background: var(--card-light);
+  }
+  .auth-logo{
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .auth-subtitle{
+    color: var(--muted);
+    margin-bottom: 32px;
+    font-size: 16px;
+  }
+  .auth-form{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .auth-form input{
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: inherit;
+    font-size: 16px;
+    width: 100%;
+  }
+  body.light .auth-form input{
+    border-color: rgba(0,0,0,0.1);
+    background: rgba(0,0,0,0.05);
+  }
+  .auth-primary-btn{
+    background: var(--accent);
+    color: white;
+    padding: 14px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 16px;
+    transition: background .2s;
+    width: 100%;
+  }
+  .auth-primary-btn:hover{
+    background: var(--accent-hover);
+  }
+  .auth-error{
+    color: #ef4444;
+    font-size: 14px;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+  .auth-loading{
+    display: none;
+    text-align: center;
+    margin-top: 16px;
+  }
+
+  /* FIXED FOLDER SECTION LAYOUT */
+  .folder-creation {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .folder-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .folder-input-row input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+    min-width: 0; /* Prevents overflow */
+  }
+
+  .folder-select-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* UPDATED: Main Library dropdown styling to match others */
+  .folder-select-row select {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 0; /* Prevents overflow */
+    transition: background 0.2s;
+  }
+
+  .folder-select-row select:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .folder-select-row .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Mobile responsive for folder section */
+  @media (max-width: 768px) {
+    .folder-input-row,
+    .folder-select-row {
+      flex-direction: column;
+    }
+    
+    .folder-input-row input,
+    .folder-select-row select {
+      width: 100%;
+    }
+  }
+
+  /* ALL OTHER STYLES REMAIN EXACTLY THE SAME */
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card-dark);position:sticky;top:0;z-index:100;}
+  body.light header{background:var(--card-light)}
+  h1{margin:0;font-size:18px}
+  .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:white;padding:8px 10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;transition:background .2s}
+  .btn:hover{background:var(--accent-hover)}
+  .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit;cursor:pointer;transition:background .2s}
+  .ghost:hover{background:rgba(255,255,255,0.05)}
+  body.light .ghost{border-color:rgba(0,0,0,0.08)}
+  body.light .ghost:hover{background:rgba(0,0,0,0.05)}
+  
+  .container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  @media (max-width:960px){.container{grid-template-columns:1fr;}}
+  @media (max-width:768px){.container{padding:12px;gap:12px;}}
+  @media (max-width:480px){.container{padding:8px;gap:8px;}}
+  
+  .sidebar{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .sidebar{background:var(--card-light)}
+  .main{background:var(--card-dark);padding:12px;border-radius:12px;min-height:60vh}
+  body.light .main{background:var(--card-light)}
+
+  .topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  input[type=search]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px}
+  body.light input[type=search]{border-color:rgba(0,0,0,0.08)}
+
+  .folders{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto;padding-right:6px}
+  .folder{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .folder:hover{background:rgba(255,255,255,0.05)}
+  .folder .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder .count{font-size:12px;color:var(--muted)}
+  
+  /* Folder collapse/expand styles */
+  .folder-header{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background-color 0.2s}
+  .folder-header:hover{background:rgba(255,255,255,0.05)}
+  .folder-header .icon{transition:transform 0.2s;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+  .folder-header.collapsed .icon{transform:rotate(-90deg)}
+  .folder-content{overflow:hidden;transition:max-height 0.3s ease-out}
+  .folder-content.collapsed{max-height:0}
+  .nested-folder{margin-left:20px;border-left:1px solid rgba(255,255,255,0.1);padding-left:8px}
+  body.light .nested-folder{border-left-color:rgba(0,0,0,0.1)}
+
+  .videoList{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto}
+  .vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;transition:background .2s}
+  .vitem:hover{background:rgba(255,255,255,0.05)}
+  .vitem.dragging{opacity:0.5;background:rgba(124,58,237,0.2);transform:scale(0.95)}
+  .vitem.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .folder.drop-target{background:rgba(124,58,237,0.1);border:2px dashed var(--accent)}
+  .thumb{width:var(--thumb-size);height:calc(var(--thumb-size)*0.6);background:#000;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .meta{flex:1;min-width:0}
+  .meta h3{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta p{margin:4px 0 0 0;font-size:12px;color:var(--muted)}
+
+  .viewer video{width:100%;height:auto;max-height:70vh;background:#000;border-radius:8px}
+  .fields{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .fields input,.fields textarea,.fields select{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;flex:1;min-width:150px}
+  body.light .fields input,body.light .fields textarea,body.light .fields select{border-color:rgba(0,0,0,0.08)}
+  .small{font-size:12px;color:var(--muted)}
+
+  .folder-actions{display:flex;gap:8px;margin-top:8px}
+  .collapse{opacity:0.8}
+  .controls .btn-sm{padding:6px 8px;font-size:13px}
+
+  /* Action Sections */
+  .action-section{margin-top:16px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+  body.light .action-section{background:rgba(0,0,0,0.02);border-color:rgba(0,0,0,0.08)}
+  .action-section h3{margin:0 0 8px 0;font-size:14px;color:var(--accent)}
+  .action-buttons{display:flex;flex-direction:column;gap:8px}
+  .action-buttons .btn,.action-buttons .ghost{width:100%;justify-content:center;text-align:center}
+  
+  /* Mobile-specific styles - Enhanced for iOS/Android */
+  .mobile-controls{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card-dark);padding:12px;border-top:1px solid rgba(255,255,255,0.1);z-index:100;padding-bottom: calc(12px + var(--safe-area))}
+  body.light .mobile-controls{background:var(--card-light);border-top-color:rgba(0,0,0,0.1)}
+  .mobile-controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  
+  /* Media type indicators */
+  .media-type-badge{background:var(--accent);color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
+  .media-type-photo{background:#10b981}
+  .media-type-video{background:#7c3aed}
+  
+  /* Add Media Buttons */
+  .add-media-buttons{display:flex;gap:8px;margin-top:8px}
+  .add-media-buttons .btn{flex:1;min-width:0} /* Ensure equal width */
+  
+  /* Firebase sync status */
+  .sync-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:8px}
+  .sync-indicator{width:8px;height:8px;border-radius:50%;background:#10b981}
+  .sync-indicator.syncing{background:#f59e0b;animation:pulse 1.5s infinite}
+  .sync-indicator.error{background:#ef4444}
+  @keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+  
+  /* Upload Progress Styles */
+  .upload-progress {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04)}
+  .progress-bar {width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 8px}
+  .progress-fill {height: 100%; background: var(--accent); transition: width 0.3s ease}
+  .progress-text {font-size: 12px; color: var(--muted); margin-top: 4px}
+  .duplicate-warning {background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 12px}
+  
+  /* Cloud Storage Styles - UPDATED */
+  .cloud-storage-dropdown {position: relative; display: inline-block; width: 100%;}
+  .cloud-storage-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .cloud-storage-btn:hover {background: rgba(255,255,255,0.05);}
+  .cloud-dropdown-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .cloud-dropdown-content.show {display: block;}
+  .cloud-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;}
+  .cloud-option:hover {background: rgba(255,255,255,0.05);}
+  .cloud-option.mega {color: #D90007;}
+  .cloud-option.local {color: #10b981;}
+  .cloud-browser {margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); display: none;}
+  .cloud-browser.show {display: block;}
+  .cloud-folder {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-folder:hover {background: rgba(255,255,255,0.05);}
+  .cloud-file {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;}
+  .cloud-file:hover {background: rgba(255,255,255,0.05);}
+  .cloud-back {padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--accent);}
+  .cloud-back:hover {background: rgba(255,255,255,0.05);}
+
+  /* URL Downloader - RESTRUCTURED */
+  .url-downloader-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .url-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .url-input-group input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: inherit;
+    font-size: 14px;
+  }
+  
+  .url-downloader-dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+  }
+  
+  .url-downloader-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+  
+  .url-downloader-btn:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  
+  .url-downloader-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-dark);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px;
+    z-index: 1000;
+    margin-top: 4px;
+  }
+  
+  .url-downloader-content.show {
+    display: block;
+  }
+  
+  .url-option {
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+  }
+  
+  .url-option:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  
+  .url-download-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  
+  .url-download-btn:hover {
+    background: var(--accent-hover);
+  }
+
+  /* File Tools Dropdown Styles */
+  .file-tools-dropdown {position: relative; display: inline-block; width: 100%;}
+  .file-tools-btn {width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px;}
+  .file-tools-btn:hover {background: rgba(255,255,255,0.05);}
+  .file-tools-content {display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card-dark); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; z-index: 1000; margin-top: 4px;}
+  .file-tools-content.show {display: block;}
+  .file-tool-option {padding: 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition:background 0.2s;}
+  .file-tool-option:hover {background: rgba(255,255,255,0.05);}
+
+  /* Custom Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  }
+  .modal-overlay.show {
+    display: flex;
+  }
+  .modal {
+    background: var(--card-dark);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  body.light .modal {
+    background: var(--card-light);
+  }
+  .modal h3 {
+    margin: 0 0 16px 0;
+    color: var(--accent);
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    justify-content: flex-end;
+  }
+  .modal-buttons .btn {
+    min-width: 80px;
+  }
+
+  /* Enhanced Video Player */
+  .video-player-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .video-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .video-player-container:hover .video-controls {
+    opacity: 1;
+  }
+  .control-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+  .progress-container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+  }
+  .time-display {
+    color: white;
+    font-size: 14px;
+    min-width: 100px;
+    text-align: center;
+  }
+
+  /* File Conversion Tools */
+  .conversion-tools {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .conversion-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .conversion-option {
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .conversion-option:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Install Prompt */
+  .install-prompt {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--accent);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .install-prompt.show {
+    display: flex;
+  }
+  .install-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* Context Menu */
+  .context-menu {
+    position: fixed;
+    background: var(--card-dark);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px;
+    z-index: 1000;
+    display: none;
+    min-width: 150px;
+  }
+  .context-menu.show {
+    display: block;
+  }
+  .context-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .context-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .context-item.danger {
+    color: #ef4444;
+  }
+
+  /* Video Popup Overlay - Google Drive Style */
+  .video-popup {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  /* When visible */
+  .video-popup.show {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* Popup content area */
+  .video-popup-content {
+    position: relative;
+    background: #000;
+    padding: 0;
+    border-radius: 12px;
+    max-width: 90%;
+    max-height: 90%;
+    width: auto;
+    height: auto;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  }
+
+  /* Scale up slightly when visible */
+  .video-popup.show .video-popup-content {
+    transform: scale(1);
+  }
+
+  /* Video inside popup */
+  .video-popup-content video {
+    width: 100%;
+    height: auto;
+    max-height: 85vh;
+    border-radius: 12px;
+    display: block;
+  }
+
+  /* Close button */
+  .close-popup {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: #fff;
+    font-size: 36px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 10000;
+    background: none;
+    border: none;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-popup:hover {
+    color: #ff6b6b;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+  }
+
+  /* Root Folder Special Styling */
+  .root-folder-option {
+    color: var(--root-folder-color);
+    font-weight: 600;
+    border-left: 3px solid var(--root-folder-color);
+    padding-left: 12px;
+    margin: 8px 0;
+    transition: all 0.3s ease;
+  }
+
+  .root-folder-option:hover {
+    color: var(--root-folder-hover);
+    background: rgba(16, 185, 129, 0.1);
+    border-left-color: var(--root-folder-hover);
+  }
+
+  /* Local Folder Import Styles */
+  .local-folder-input {
+    display: none;
+  }
+
+  /* NEW: Folder Delete Button Styles */
+  .folder-delete-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    opacity: 0.7;
+    transition: all 0.2s;
+  }
+
+  .folder-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  /* Twitter Video Preview Styles */
+  .twitter-preview {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+    display: none;
+  }
+  
+  .twitter-preview.show {
+    display: block;
+  }
+  
+  .twitter-video-preview {
+    width: 100%;
+    max-width: 400px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .twitter-video-info {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  
+  .twitter-download-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .twitter-download-btn {
+    padding: 8px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+  }
+  
+  .twitter-download-btn:hover {
+    background: var(--accent-hover);
+  }
+
+  /* Drag and Drop Styles */
+  .vitem.drag-over {
+    background: rgba(124, 58, 237, 0.2);
+    border: 2px dashed var(--accent);
+  }
+  
+  .folder-item.drag-over {
+    background: rgba(124, 58, 237, 0.2);
+    border: 2px dashed var(--accent);
+  }
+  
+  .drag-indicator {
+    position: fixed;
+    background: var(--accent);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    z-index: 10000;
+    pointer-events: none;
+    font-size: 14px;
+    display: none;
+  }
+
+  /* Enhanced mobile styles */
+  @media (max-width:768px){
+    .container{min-height:calc(100vh - 120px);margin-bottom:70px}
+    .mobile-controls{display:block}
+    .desktop-controls{display:none}
+    .folders, .videoList{max-height:30vh}
+    .fields{flex-direction:column}
+    .fields input,.fields textarea,.fields select{min-width:auto}
+    .viewer video{max-height:50vh}
+    .thumb{width:80px;height:48px}
+    
+    /* Better touch targets for mobile */
+    .vitem, .folder, .folder-header{padding:12px 10px;min-height:48px}
+    .btn, .ghost{min-height:44px;display:flex;align-items:center;justify-content:center}
+    
+    /* Improved mobile header */
+    header{padding:10px 12px}
+    h1{font-size:16px}
+    
+    /* Better mobile controls layout */
+    .mobile-controls-grid{grid-template-columns:1fr 1fr;gap:8px}
+    
+    /* Mobile auth styles */
+    .auth-card{padding:24px;margin:20px}
+    .auth-container{padding:20px 0}
+
+    /* Mobile video controls */
+    .video-controls {
+      opacity: 1;
+      padding: 12px;
+    }
+    .control-btn {
+      font-size: 18px;
+      padding: 6px;
+    }
+  }
+
+  /* Dark mode improvements */
+  @media (prefers-color-scheme:dark){
+    body{background:var(--bg-dark);color:var(--text-dark)}
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast:high){
+    :root{
+      --accent:#0000ff;
+      --accent-hover:#0000cc;
+    }
+    .btn, .ghost{border-width:2px}
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;animation:none !important}
+  }
+
+  /* Screen reader only text */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* Loading spinner */
+  .loading{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin 1s ease-in-out infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Toast notifications */
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card-dark);color:var(--text-dark);padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:1000;display:none;align-items:center;gap:10px;max-width:90%;border-left:4px solid var(--accent)}
+  body.light .toast{background:var(--card-light);color:var(--text-light)}
+  .toast.show{display:flex;animation:fadeInUp 0.3s ease}
+  .toast.success{border-left-color:#10b981}
+  .toast.error{border-left-color:#ef4444}
+  .toast.warning{border-left-color:#f59e0b}
+  @keyframes fadeInUp{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}
+</style>
+</head>
+<body>
+<!-- Auth Screen - ALWAYS VISIBLE initially -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">MediaTracker Pro</div>
+      <div class="auth-subtitle">Your Ultimate Media Organizer</div>
+      <form class="auth-form" id="authForm">
+        <input type="text" id="authKey" placeholder="Enter your access key" required autocomplete="off">
+        <button type="submit" class="auth-primary-btn">Access Library</button>
+      </form>
+      <div class="auth-error" id="authError">Invalid access key. Please try again.</div>
+      <div class="auth-loading" id="authLoading">
+        <div class="loading"></div>
+        <span>Verifying...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- App Container - COMPLETELY HIDDEN until authenticated -->
+<div id="appContainer">
+  <header>
+    <h1>MediaTracker Pro</h1>
+    <div class="controls desktop-controls">
+      <button class="ghost" id="themeToggle">🌓</button>
+      <button class="btn" id="addMediaBtn">Add Media</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="sidebar">
+      <div class="topbar">
+        <input type="search" id="searchInput" placeholder="Search media...">
+        <button class="ghost collapse" id="collapseAllBtn">−</button>
+      </div>
+      
+      <div class="folder-creation">
+        <div class="folder-input-row">
+          <input type="text" id="newFolderName" placeholder="New folder name">
+          <button class="btn" id="createFolderBtn">Create</button>
+        </div>
+        <div class="folder-select-row">
+          <select id="parentFolderSelect">
+            <option value="root">Main Library</option>
+          </select>
+          <button class="ghost" id="refreshFoldersBtn">↻</button>
+        </div>
+      </div>
+
+      <div class="folders" id="foldersList">
+        <!-- Folders will be populated here -->
+      </div>
+
+      <div class="action-section">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+          <button class="btn" id="importLocalBtn">Import Local Files</button>
+          <button class="ghost" id="exportDataBtn">Export Library</button>
+          <button class="ghost" id="settingsBtn">Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <input type="search" id="mediaSearch" placeholder="Search in current folder...">
+        <button class="ghost" id="sortMediaBtn">Sort: Date ↓</button>
+      </div>
+
+      <div class="videoList" id="videoList">
+        <!-- Videos will be populated here -->
+      </div>
+
+      <div class="viewer" id="viewer" style="display:none">
+        <video controls id="videoPlayer"></video>
+        <div class="fields">
+          <input type="text" id="editTitle" placeholder="Title">
+          <input type="text" id="editDescription" placeholder="Description">
+          <select id="editFolder">
+            <option value="root">Main Library</option>
+          </select>
+        </div>
+        <div class="small">Drag and drop to reorder in current folder</div>
+        <div class="folder-actions">
+          <button class="btn" id="saveChangesBtn">Save Changes</button>
+          <button class="ghost" id="deleteMediaBtn">Delete Media</button>
+        </div>
+      </div>
+
+      <!-- URL Downloader Section -->
+      <div class="action-section url-downloader-section">
+        <h3>Download from URL</h3>
+        <div class="url-input-group">
+          <input type="url" id="mediaUrl" placeholder="Paste video/image URL here...">
+          <div class="url-downloader-dropdown">
+            <button class="url-downloader-btn" id="urlDownloaderBtn">
+              <span>Select Platform</span>
+              <span>▼</span>
+            </button>
+            <div class="url-downloader-content" id="urlDownloaderContent">
+              <div class="url-option" data-platform="twitter">Twitter/X</div>
+              <div class="url-option" data-platform="youtube">YouTube</div>
+              <div class="url-option" data-platform="instagram">Instagram</div>
+              <div class="url-option" data-platform="tiktok">TikTok</div>
+              <div class="url-option" data-platform="generic">Generic URL</div>
+            </div>
+          </div>
+          <button class="url-download-btn" id="downloadUrlBtn" disabled>Download Media</button>
+        </div>
+        <!-- Twitter Preview Container -->
+        <div class="twitter-preview" id="twitterPreview">
+          <!-- Preview content will be injected here -->
+        </div>
+      </div>
+
+      <!-- Cloud Storage Section -->
+      <div class="action-section">
+        <h3>Cloud Storage</h3>
+        <div class="cloud-storage-dropdown">
+          <button class="cloud-storage-btn" id="cloudStorageBtn">
+            <span>Select Cloud Service</span>
+            <span>▼</span>
+          </button>
+          <div class="cloud-dropdown-content" id="cloudDropdownContent">
+            <div class="cloud-option mega" data-service="mega">
+              <span>MEGA</span>
+            </div>
+            <div class="cloud-option local" data-service="local">
+              <span>Local Files</span>
+            </div>
+          </div>
+        </div>
+        <div class="cloud-browser" id="cloudBrowser">
+          <!-- Cloud browser content will be injected here -->
+        </div>
+      </div>
+
+      <!-- File Tools Section -->
+      <div class="action-section">
+        <h3>File Tools</h3>
+        <div class="file-tools-dropdown">
+          <button class="file-tools-btn" id="fileToolsBtn">
+            <span>Select Tool</span>
+            <span>▼</span>
+          </button>
+          <div class="file-tools-content" id="fileToolsContent">
+            <div class="file-tool-option" data-tool="convert">
+              <span>Convert Format</span>
+            </div>
+            <div class="file-tool-option" data-tool="compress">
+              <span>Compress Video</span>
+            </div>
+            <div class="file-tool-option" data-tool="extract">
+              <span>Extract Audio</span>
+            </div>
+          </div>
+        </div>
+        <div class="conversion-tools" id="conversionTools" style="display:none">
+          <!-- Conversion tools will be injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-controls">
+    <div class="mobile-controls-grid">
+      <button class="btn" id="mobileAddBtn">Add Media</button>
+      <button class="ghost" id="mobileThemeBtn">Theme</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Popup Overlay -->
+<div class="video-popup" id="videoPopup">
+  <button class="close-popup" id="closePopup">&times;</button>
+  <div class="video-popup-content">
+    <video controls id="popupVideoPlayer"></video>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast"></div>
+
+<!-- Drag Indicator -->
+<div class="drag-indicator" id="dragIndicator">Moving item...</div>
+
+<!-- File Input (Hidden) -->
+<input type="file" id="fileInput" multiple accept="video/*,image/*" style="display:none">
+<input type="file" id="localFolderInput" webkitdirectory multiple style="display:none">
+
+<script>
+// ==============================
+// AUTHENTICATION SYSTEM
+// ==============================
+
+// Hardcoded access keys (in a real app, these would be validated server-side)
+const VALID_ACCESS_KEYS = ['media2024', 'proaccess', 'demo123'];
+
+// DOM Elements
+const authScreen = document.getElementById('authScreen');
+const appContainer = document.getElementById('appContainer');
+const authForm = document.getElementById('authForm');
+const authKeyInput = document.getElementById('authKey');
+const authError = document.getElementById('authError');
+const authLoading = document.getElementById('authLoading');
+
+// Check if already authenticated
+function checkExistingAuth() {
+  const savedAuth = localStorage.getItem('mediaTrackerAuth');
+  const authTimestamp = localStorage.getItem('mediaTrackerAuthTimestamp');
+  
+  if (savedAuth && authTimestamp) {
+    // Check if authentication is still valid (24 hours)
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    
+    if (now - parseInt(authTimestamp) < twentyFourHours) {
+      // Valid authentication found
+      showApp();
+      return true;
+    } else {
+      // Authentication expired
+      clearAuth();
+    }
+  }
+  return false;
+}
+
+// Authenticate user
+function authenticate(key) {
+  const trimmedKey = key.trim();
+  
+  if (VALID_ACCESS_KEYS.includes(trimmedKey)) {
+    // Save authentication
+    localStorage.setItem('mediaTrackerAuth', trimmedKey);
+    localStorage.setItem('mediaTrackerAuthTimestamp', Date.now().toString());
+    return true;
+  }
+  return false;
+}
+
+// Clear authentication
+function clearAuth() {
+  localStorage.removeItem('mediaTrackerAuth');
+  localStorage.removeItem('mediaTrackerAuthTimestamp');
+  showAuth();
+}
+
+// Show authentication screen
+function showAuth() {
+  authScreen.classList.remove('authenticated');
+  appContainer.classList.remove('authenticated');
+  authError.style.display = 'none';
+  authKeyInput.value = '';
+}
+
+// Show main application
+function showApp() {
+  authScreen.classList.add('authenticated');
+  appContainer.classList.add('authenticated');
+  initializeApp();
+}
+
+// Initialize main application
+function initializeApp() {
+  // Your existing app initialization code here
+  console.log('Initializing MediaTracker Pro...');
+  
+  // Initialize Firebase
+  initFirebase();
+  
+  // Load folders and media
+  loadFolders();
+  loadMedia();
+  
+  // Set up event listeners
+  setupEventListeners();
+}
+
+// Event listeners for authentication
+authForm.addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const accessKey = authKeyInput.value;
+  
+  // Show loading state
+  authLoading.style.display = 'block';
+  authError.style.display = 'none';
+  
+  // Simulate network delay
+  setTimeout(() => {
+    if (authenticate(accessKey)) {
+      showApp();
+    } else {
+      authError.style.display = 'block';
+      authKeyInput.focus();
+    }
+    authLoading.style.display = 'none';
+  }, 800);
+});
+
+// Check for existing authentication on page load
+document.addEventListener('DOMContentLoaded', function() {
+  if (!checkExistingAuth()) {
+    showAuth();
+  }
+});
+
+// ==============================
+// FIREBASE CONFIGURATION
+// ==============================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4mZRypPq6_2H4jGg2Q6d7V9q8w9XyZ0A",
+  authDomain: "mediatracker-pro.firebaseapp.com",
+  projectId: "mediatracker-pro",
+  storageBucket: "mediatracker-pro.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdef123456"
+};
+
+// Initialize Firebase
+let db;
+let storage;
+
+function initFirebase() {
+  try {
+    // In a real implementation, you would initialize Firebase here
+    console.log('Firebase initialized with config:', firebaseConfig);
+    
+    // For demo purposes, we'll use localStorage as a fallback
+    console.log('Using localStorage for data persistence');
+    
+    // Initialize sync status
+    updateSyncStatus('connected');
+  } catch (error) {
+    console.error('Firebase initialization failed:', error);
+    updateSyncStatus('error');
+  }
+}
+
+// ==============================
+// DATA MANAGEMENT
+// ==============================
+
+let folders = JSON.parse(localStorage.getItem('mediaTracker_folders')) || [];
+let media = JSON.parse(localStorage.getItem('mediaTracker_media')) || [];
+let currentFolder = 'root';
+let currentMedia = null;
+let dragSource = null;
+
+// Save data to localStorage
+function saveData() {
+  localStorage.setItem('mediaTracker_folders', JSON.stringify(folders));
+  localStorage.setItem('mediaTracker_media', JSON.stringify(media));
+  updateSyncStatus('syncing');
+  
+  // Simulate cloud sync
+  setTimeout(() => {
+    updateSyncStatus('connected');
+    showToast('Changes saved successfully', 'success');
+  }, 1000);
+}
+
+// Update sync status indicator
+function updateSyncStatus(status) {
+  const indicator = document.querySelector('.sync-indicator');
+  if (indicator) {
+    indicator.className = 'sync-indicator ' + status;
+  }
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = `toast ${type} show`;
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+}
+
+// ==============================
+// UNIFIED MEDIA UPLOAD FUNCTION
+// ==============================
+
+async function saveMediaToStorage(file, metadata = {}) {
+  console.log('Starting media upload process...', { 
+    fileName: file.name, 
+    fileType: file.type,
+    fileSize: file.size,
+    metadata 
+  });
+
+  try {
+    // Validate file
+    if (!file || !(file instanceof File)) {
+      throw new Error('Invalid file provided');
+    }
+
+    // Check file size (100MB limit)
+    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+    if (file.size > maxSize) {
+      throw new Error(`File size too large: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 100MB`);
+    }
+
+    // Check for duplicates
+    const existingMedia = media.find(m => 
+      m.name === file.name && 
+      m.size === file.size &&
+      m.folder === (metadata.folder || currentFolder)
+    );
+
+    if (existingMedia) {
+      console.warn('Duplicate file detected:', file.name);
+      const overwrite = confirm(`"${file.name}" already exists in this folder. Do you want to replace it?`);
+      if (!overwrite) {
+        throw new Error('Upload cancelled - duplicate file');
+      }
+      
+      // Remove existing media
+      media = media.filter(m => m.id !== existingMedia.id);
+    }
+
+    // Create media object
+    const mediaObj = {
+      id: generateId(),
+      name: metadata.name || file.name,
+      description: metadata.description || '',
+      type: file.type.startsWith('video/') ? 'video' : 'image',
+      url: null, // Will be set after upload
+      thumbnail: null,
+      size: file.size,
+      duration: metadata.duration || 0,
+      folder: metadata.folder || currentFolder,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: metadata.tags || [],
+      source: metadata.source || 'local',
+      originalUrl: metadata.originalUrl || null
+    };
+
+    console.log('Created media object:', mediaObj);
+
+    // Simulate upload progress
+    const progressCallback = metadata.progressCallback || function(progress) {
+      console.log(`Upload progress: ${progress}%`);
+    };
+
+    // Upload file (simulated)
+    console.log('Starting file upload simulation...');
+    
+    // Simulate upload with progress
+    await simulateUploadWithProgress(file, progressCallback);
+    
+    // Generate URL (in real app, this would be the cloud storage URL)
+    mediaObj.url = URL.createObjectURL(file);
+    
+    // Generate thumbnail for videos
+    if (mediaObj.type === 'video') {
+      try {
+        mediaObj.thumbnail = await generateVideoThumbnail(file);
+        console.log('Video thumbnail generated successfully');
+      } catch (thumbError) {
+        console.warn('Could not generate video thumbnail:', thumbError);
+        mediaObj.thumbnail = null;
+      }
+    } else if (mediaObj.type === 'image') {
+      // For images, use the image itself as thumbnail
+      mediaObj.thumbnail = mediaObj.url;
+    }
+
+    // Add to media array
+    media.push(mediaObj);
+    console.log('Media added to collection:', mediaObj);
+
+    // Save data
+    saveData();
+
+    // Reload media list
+    loadMedia();
+
+    console.log('Media upload completed successfully');
+    showToast(`${file.name} uploaded successfully`, 'success');
+    
+    return mediaObj;
+
+  } catch (error) {
+    console.error('Error in saveMediaToStorage:', error);
+    showToast(`Upload failed: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+// Simulate upload with progress
+function simulateUploadWithProgress(file, progressCallback) {
+  return new Promise((resolve) => {
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.random() * 15;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+        progressCallback(progress);
+        resolve();
+      } else {
+        progressCallback(Math.min(progress, 99));
+      }
+    }, 200);
+  });
+}
+
+// Generate video thumbnail
+function generateVideoThumbnail(videoFile) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    video.addEventListener('loadeddata', () => {
+      // Seek to 10% of duration or 2 seconds, whichever is smaller
+      const seekTime = Math.min(video.duration * 0.1, 2);
+      video.currentTime = seekTime;
+    });
+
+    video.addEventListener('seeked', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const thumbnailUrl = URL.createObjectURL(blob);
+          resolve(thumbnailUrl);
+        } else {
+          reject(new Error('Could not generate thumbnail blob'));
+        }
+      }, 'image/jpeg', 0.8);
+    });
+
+    video.addEventListener('error', () => {
+      reject(new Error('Video error while generating thumbnail'));
+    });
+
+    video.src = URL.createObjectURL(videoFile);
+  });
+}
+
+// ==============================
+// TWITTER DOWNLOAD FUNCTIONS
+// ==============================
+
+async function downloadTwitterMedia(url, quality = 'highest') {
+  console.log('Downloading Twitter media:', { url, quality });
+  
+  try {
+    showToast('Fetching Twitter media...', 'info');
+    
+    // Validate Twitter URL
+    if (!isValidTwitterUrl(url)) {
+      throw new Error('Invalid Twitter URL');
+    }
+
+    // In a real implementation, you would use a server-side API
+    // For demo purposes, we'll simulate the download process
+    
+    const mediaData = await simulateTwitterDownload(url, quality);
+    
+    // Create file from simulated data
+    const file = new File([mediaData.blob], mediaData.filename, {
+      type: mediaData.type
+    });
+
+    // Save to storage
+    const metadata = {
+      name: mediaData.filename,
+      description: `Downloaded from Twitter: ${url}`,
+      duration: mediaData.duration,
+      source: 'twitter',
+      originalUrl: url,
+      tags: ['twitter', 'downloaded']
+    };
+
+    const savedMedia = await saveMediaToStorage(file, metadata);
+    return savedMedia;
+
+  } catch (error) {
+    console.error('Twitter download error:', error);
+    showToast(`Twitter download failed: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+// Enhanced Twitter download with preview
+async function downloadTwitterVideo(url) {
+  console.log('Starting enhanced Twitter video download:', url);
+  
+  try {
+    // Show preview first
+    const previewData = await getTwitterVideoPreview(url);
+    
+    if (previewData && previewData.variants && previewData.variants.length > 0) {
+      // Show preview to user
+      showTwitterPreview(previewData);
+      
+      // Return promise that resolves when user selects a quality
+      return new Promise((resolve, reject) => {
+        // This will be handled by the preview interface
+        window.twitterDownloadHandler = { resolve, reject };
+      });
+    } else {
+      throw new Error('No video variants found');
+    }
+  } catch (error) {
+    console.error('Enhanced Twitter download error:', error);
+    showToast(`Twitter download failed: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+// Get Twitter video preview
+async function getTwitterVideoPreview(url) {
+  console.log('Getting Twitter video preview for:', url);
+  
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // Simulated response with multiple quality options
+  return {
+    url: url,
+    thumbnail: 'https://picsum.photos/400/225', // Random placeholder
+    variants: [
+      { quality: 'highest', bitrate: 2176000, url: 'simulated://twitter/highest' },
+      { quality: 'high', bitrate: 832000, url: 'simulated://twitter/high' },
+      { quality: 'medium', bitrate: 320000, url: 'simulated://twitter/medium' },
+      { quality: 'low', bitrate: 128000, url: 'simulated://twitter/low' }
+    ],
+    duration: 45, // seconds
+    size: 12582912 // bytes
+  };
+}
+
+// Show Twitter preview
+function showTwitterPreview(previewData) {
+  const previewContainer = document.getElementById('twitterPreview');
+  const downloadOptions = previewData.variants.map(variant => 
+    `<button class="twitter-download-btn" data-quality="${variant.quality}">
+       Download ${variant.quality} quality (${(variant.bitrate / 1000).toFixed(0)}kbps)
+     </button>`
+  ).join('');
+
+  previewContainer.innerHTML = `
+    <div class="twitter-video-info">
+      <strong>Twitter Video Preview</strong><br>
+      Duration: ${previewData.duration}s | Size: ${(previewData.size / (1024 * 1024)).toFixed(2)}MB
+    </div>
+    <div class="twitter-download-options">
+      ${downloadOptions}
+    </div>
+  `;
+
+  previewContainer.classList.add('show');
+
+  // Add event listeners to download buttons
+  previewContainer.querySelectorAll('.twitter-download-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const quality = btn.getAttribute('data-quality');
+      previewContainer.classList.remove('show');
+      
+      try {
+        const result = await downloadTwitterMedia(previewData.url, quality);
+        if (window.twitterDownloadHandler) {
+          window.twitterDownloadHandler.resolve(result);
+        }
+      } catch (error) {
+        if (window.twitterDownloadHandler) {
+          window.twitterDownloadHandler.reject(error);
+        }
+      }
+    });
+  });
+}
+
+// ==============================
+// REGULAR URL DOWNLOAD FUNCTION
+// ==============================
+
+async function downloadFromUrl(url, platform = 'generic') {
+  console.log('Downloading from URL:', { url, platform });
+  
+  try {
+    showToast(`Fetching from ${platform}...`, 'info');
+
+    // Validate URL
+    if (!isValidUrl(url)) {
+      throw new Error('Invalid URL format');
+    }
+
+    // Platform-specific handling
+    let mediaData;
+    switch (platform) {
+      case 'twitter':
+        return await downloadTwitterVideo(url);
+      
+      case 'youtube':
+        mediaData = await simulateYoutubeDownload(url);
+        break;
+      
+      case 'instagram':
+        mediaData = await simulateInstagramDownload(url);
+        break;
+      
+      case 'tiktok':
+        mediaData = await simulateTiktokDownload(url);
+        break;
+      
+      case 'generic':
+      default:
+        mediaData = await simulateGenericDownload(url);
+        break;
+    }
+
+    // Create file
+    const file = new File([mediaData.blob], mediaData.filename, {
+      type: mediaData.type
+    });
+
+    // Save to storage
+    const metadata = {
+      name: mediaData.filename,
+      description: `Downloaded from ${platform}: ${url}`,
+      duration: mediaData.duration || 0,
+      source: platform,
+      originalUrl: url,
+      tags: [platform, 'downloaded']
+    };
+
+    const savedMedia = await saveMediaToStorage(file, metadata);
+    return savedMedia;
+
+  } catch (error) {
+    console.error('URL download error:', error);
+    showToast(`Download failed: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+// ==============================
+// UTILITY FUNCTIONS
+// ==============================
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isValidTwitterUrl(url) {
+  return url.includes('twitter.com') || url.includes('x.com');
+}
+
+// Simulation functions for demo purposes
+async function simulateTwitterDownload(url, quality) {
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  
+  // Create a simulated video blob
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw a gradient background
+  const gradient = ctx.createLinearGradient(0, 0, 640, 360);
+  gradient.addColorStop(0, '#1da1f2');
+  gradient.addColorStop(1, '#0d8bd9');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 640, 360);
+  
+  // Add text
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Twitter Video Download', 320, 180);
+  ctx.font = '16px Arial';
+  ctx.fillText(`Quality: ${quality}`, 320, 210);
+  ctx.fillText('Simulated Download', 320, 240);
+  
+  return new Promise(resolve => {
+    canvas.toBlob(blob => {
+      resolve({
+        blob: blob,
+        filename: `twitter_video_${quality}_${Date.now()}.mp4`,
+        type: 'video/mp4',
+        duration: 45
+      });
+    }, 'video/mp4');
+  });
+}
+
+async function simulateYoutubeDownload(url) {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  // Similar simulation for YouTube...
+  return {
+    blob: new Blob(['simulated youtube video'], { type: 'video/mp4' }),
+    filename: `youtube_video_${Date.now()}.mp4`,
+    type: 'video/mp4',
+    duration: 120
+  };
+}
+
+async function simulateInstagramDownload(url) {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  // Similar simulation for Instagram...
+  return {
+    blob: new Blob(['simulated instagram video'], { type: 'video/mp4' }),
+    filename: `instagram_video_${Date.now()}.mp4`,
+    type: 'video/mp4',
+    duration: 60
+  };
+}
+
+async function simulateTiktokDownload(url) {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  // Similar simulation for TikTok...
+  return {
+    blob: new Blob(['simulated tiktok video'], { type: 'video/mp4' }),
+    filename: `tiktok_video_${Date.now()}.mp4`,
+    type: 'video/mp4',
+    duration: 30
+  };
+}
+
+async function simulateGenericDownload(url) {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Try to determine if it's an image or video
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi'];
+  
+  const isImage = imageExtensions.some(ext => url.toLowerCase().includes(ext));
+  const isVideo = videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  
+  const type = isImage ? 'image/jpeg' : isVideo ? 'video/mp4' : 'application/octet-stream';
+  const extension = isImage ? 'jpg' : isVideo ? 'mp4' : 'bin';
+  
+  return {
+    blob: new Blob([`simulated download from ${url}`], { type }),
+    filename: `downloaded_file_${Date.now()}.${extension}`,
+    type: type,
+    duration: isVideo ? 30 : 0
+  };
+}
+
+// ==============================
+// ENHANCED VIDEO VIEWER FUNCTION
+// ==============================
+
+function openVideoViewer(mediaItem, listItem = null) {
+  console.log('Opening enhanced video viewer for:', mediaItem);
+  
+  try {
+    const videoPopup = document.getElementById('videoPopup');
+    const popupVideo = document.getElementById('popupVideoPlayer');
+    const closePopup = document.getElementById('closePopup');
+
+    if (!videoPopup || !popupVideo) {
+      throw new Error('Video popup elements not found');
+    }
+
+    // Set video source
+    popupVideo.src = mediaItem.url;
+    popupVideo.poster = mediaItem.thumbnail || '';
+    
+    // Set video title for accessibility
+    popupVideo.setAttribute('aria-label', mediaItem.name);
+
+    // Enhanced error handling
+    popupVideo.onerror = function() {
+      console.error('Error loading video:', mediaItem.url);
+      showToast('Error loading video file', 'error');
+      closeVideoViewer();
+    };
+
+    popupVideo.onloadstart = function() {
+      console.log('Video loading started');
+    };
+
+    popupVideo.oncanplay = function() {
+      console.log('Video can start playing');
+    };
+
+    // Show popup
+    videoPopup.classList.add('show');
+    
+    // Prevent body scroll
+    document.body.style.overflow = 'hidden';
+
+    // Close popup handlers
+    function closeHandler() {
+      closeVideoViewer();
+    }
+
+    closePopup.onclick = closeHandler;
+    
+    // Close on escape key
+    function escapeHandler(e) {
+      if (e.key === 'Escape') {
+        closeVideoViewer();
+      }
+    }
+    
+    // Close on background click
+    function backgroundHandler(e) {
+      if (e.target === videoPopup) {
+        closeVideoViewer();
+      }
+    }
+
+    videoPopup.addEventListener('click', backgroundHandler);
+    document.addEventListener('keydown', escapeHandler);
+
+    // Store handlers for cleanup
+    videoPopup._closeHandlers = {
+      background: backgroundHandler,
+      escape: escapeHandler
+    };
+
+    // Play video automatically (optional)
+    popupVideo.play().catch(e => {
+      console.warn('Autoplay prevented:', e);
+    });
+
+    // Update current media
+    currentMedia = mediaItem;
+
+  } catch (error) {
+    console.error('Error opening video viewer:', error);
+    showToast('Error opening video', 'error');
+  }
+}
+
+function closeVideoViewer() {
+  const videoPopup = document.getElementById('videoPopup');
+  const popupVideo = document.getElementById('popupVideoPlayer');
+  
+  if (popupVideo) {
+    popupVideo.pause();
+    popupVideo.src = '';
+  }
+  
+  if (videoPopup) {
+    videoPopup.classList.remove('show');
+    
+    // Remove event listeners
+    if (videoPopup._closeHandlers) {
+      videoPopup.removeEventListener('click', videoPopup._closeHandlers.background);
+      document.removeEventListener('keydown', videoPopup._closeHandlers.escape);
+      delete videoPopup._closeHandlers;
+    }
+  }
+  
+  // Restore body scroll
+  document.body.style.overflow = '';
+  
+  currentMedia = null;
+}
+
+// ==============================
+// EVENT LISTENERS SETUP
+// ==============================
+
+function setupEventListeners() {
+  // URL Downloader functionality
+  const urlDownloaderBtn = document.getElementById('urlDownloaderBtn');
+  const urlDownloaderContent = document.getElementById('urlDownloaderContent');
+  const mediaUrlInput = document.getElementById('mediaUrl');
+  const downloadUrlBtn = document.getElementById('downloadUrlBtn');
+
+  if (urlDownloaderBtn && urlDownloaderContent) {
+    // Toggle dropdown
+    urlDownloaderBtn.addEventListener('click', () => {
+      urlDownloaderContent.classList.toggle('show');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!urlDownloaderBtn.contains(e.target) && !urlDownloaderContent.contains(e.target)) {
+        urlDownloaderContent.classList.remove('show');
+      }
+    });
+
+    // Platform selection
+    urlDownloaderContent.querySelectorAll('.url-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const platform = option.getAttribute('data-platform');
+        urlDownloaderBtn.querySelector('span').textContent = option.textContent;
+        urlDownloaderContent.classList.remove('show');
+        
+        // Store selected platform
+        mediaUrlInput.dataset.selectedPlatform = platform;
+        
+        // Enable download button if URL is present
+        if (mediaUrlInput.value.trim()) {
+          downloadUrlBtn.disabled = false;
+        }
+      });
+    });
+  }
+
+  // URL input validation
+  if (mediaUrlInput) {
+    mediaUrlInput.addEventListener('input', () => {
+      const hasUrl = mediaUrlInput.value.trim().length > 0;
+      const hasPlatform = mediaUrlInput.dataset.selectedPlatform;
+      downloadUrlBtn.disabled = !(hasUrl && hasPlatform);
+    });
+  }
+
+  // Download button handler
+  if (downloadUrlBtn) {
+    downloadUrlBtn.addEventListener('click', async () => {
+      const url = mediaUrlInput.value.trim();
+      const platform = mediaUrlInput.dataset.selectedPlatform || 'generic';
+      
+      if (!url) {
+        showToast('Please enter a URL', 'warning');
+        return;
+      }
+
+      try {
+        downloadUrlBtn.disabled = true;
+        downloadUrlBtn.textContent = 'Downloading...';
+        
+        await downloadFromUrl(url, platform);
+        
+        // Reset form
+        mediaUrlInput.value = '';
+        mediaUrlInput.dataset.selectedPlatform = '';
+        urlDownloaderBtn.querySelector('span').textContent = 'Select Platform';
+        downloadUrlBtn.disabled = true;
+        
+      } catch (error) {
+        console.error('Download failed:', error);
+      } finally {
+        downloadUrlBtn.textContent = 'Download Media';
+        downloadUrlBtn.disabled = false;
+      }
+    });
+  }
+
+  // File input handler
+  const fileInput = document.getElementById('fileInput');
+  const addMediaBtn = document.getElementById('addMediaBtn');
+  const mobileAddBtn = document.getElementById('mobileAddBtn');
+
+  [addMediaBtn, mobileAddBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        fileInput.click();
+      });
+    }
+  });
+
+  fileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    
+    for (const file of files) {
+      try {
+        await saveMediaToStorage(file, {
+          folder: currentFolder,
+          progressCallback: (progress) => {
+            console.log(`Upload progress for ${file.name}: ${progress}%`);
+          }
+        });
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
+      }
+    }
+    
+    // Reset file input
+    fileInput.value = '';
+  });
+
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  const mobileThemeBtn = document.getElementById('mobileThemeBtn');
+  
+  [themeToggle, mobileThemeBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', toggleTheme);
+    }
+  });
+
+  // Initialize theme
+  const savedTheme = localStorage.getItem('mediaTracker_theme') || 'dark';
+  document.body.classList.toggle('light', savedTheme === 'light');
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('mediaTracker_theme', isLight ? 'light' : 'dark');
+}
+
+// ==============================
+// FOLDER AND MEDIA MANAGEMENT
+// ==============================
+
+function loadFolders() {
+  // Implementation for loading folders
+  console.log('Loading folders...');
+}
+
+function loadMedia() {
+  // Implementation for loading media
+  console.log('Loading media...');
+}
+
+// ==============================
+// INITIALIZATION
+// ==============================
+
+// The app will initialize automatically after successful authentication
+// through the initializeApp() function called in showApp()
+
+console.log('MediaTracker Pro - Enhanced version loaded');
+</script>
+</body>
+</html>
