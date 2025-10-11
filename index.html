@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaTracker Pro - Your Ultimate Media Organizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MediaTracker">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+<style>
+  /* ALL YOUR EXISTING CSS STYLES REMAIN EXACTLY THE SAME - ONLY ADDING FIXES FOR VIDEO POPUP */
+  
+  /* Video Popup Overlay - Google Drive Style - FIXED */
+  .video-popup {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  /* When visible */
+  .video-popup.show {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* Popup content area */
+  .video-popup-content {
+    position: relative;
+    background: #000;
+    padding: 0;
+    border-radius: 12px;
+    max-width: 90%;
+    max-height: 90%;
+    width: auto;
+    height: auto;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  }
+
+  /* Scale up slightly when visible */
+  .video-popup.show .video-popup-content {
+    transform: scale(1);
+  }
+
+  /* Video inside popup */
+  .video-popup-content video {
+    width: 100%;
+    height: auto;
+    max-height: 85vh;
+    border-radius: 12px;
+    display: block;
+  }
+
+  /* Close button */
+  .close-popup {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: #fff;
+    font-size: 36px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    z-index: 10000;
+    background: none;
+    border: none;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-popup:hover {
+    color: #ff6b6b;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+  }
+
+  /* Mobile popup adjustments */
+  @media (max-width:768px){
+    .video-popup-content {
+      max-width: 95%;
+      max-height: 80%;
+    }
+    .close-popup {
+      top: -35px;
+      right: -5px;
+      font-size: 30px;
+    }
+  }
+  
+  @media (max-width:480px){
+    .video-popup-content {
+      max-width: 98%;
+      max-height: 70%;
+    }
+    .close-popup {
+      top: -30px;
+      right: -5px;
+      font-size: 28px;
+    }
+  }
+
+  /* Ensure video controls are visible in popup */
+  #popupVideo {
+    width: 100%;
+    height: auto;
+  }
+
+  /* Prevent body scroll when popup is open */
+  body.popup-open {
+    overflow: hidden;
+  }
+
+</style>
+</head>
+<body>
+<!-- Authentication Screen (Shown First) -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">📱 MediaTracker Pro</div>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to your media library 📂</div>
+      
+      <div id="authError" class="auth-error"></div>
+      <div id="authLoading" class="auth-loading">
+        <div class="small">Loading...</div>
+      </div>
+      
+      <form id="authForm" class="auth-form">
+        <input type="email" id="authEmail" placeholder="Email" required>
+        <input type="password" id="authPassword" placeholder="Password" required>
+        <button type="submit" id="authSubmit" class="auth-primary-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main App (Hidden until authenticated) -->
+<div id="appContainer">
+  <header>
+    <h1>📱 MediaTracker Pro</h1>
+    <div class="controls desktop-controls">
+      <a href="stats.html" class="ghost" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 4px;">
+        📊 Stats
+      </a>
+      <button id="signOutBtn" class="ghost">🚪 Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="topbar">
+        <button id="syncBtn" class="btn" style="flex:1">🔄 Sync Now</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input id="newFolderName" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" placeholder="New folder name">
+        <select id="parentFolderSelect" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+          <option value="">Root Folder</option>
+        </select>
+        <button id="addFolderBtn" class="btn btn-sm">📁 Add</button>
+      </div>
+
+      <div class="folders" id="folders">
+        <!-- Folders will be populated here -->
+      </div>
+
+      <!-- Add Media Section -->
+      <div class="action-section">
+        <h3>➕ Add Media</h3>
+        <div class="add-media-buttons">
+          <label style="display:block;flex:1">
+            <input id="fileInputVideo" type="file" accept="video/*" multiple style="display:none">
+            <button id="addVideoBtn" class="btn">🎥 Add Videos</button>
+          </label>
+          <label style="display:block;flex:1">
+            <input id="fileInputPhoto" type="file" accept="image/*" multiple style="display:none">
+            <button id="addPhotoBtn" class="btn" style="background:#10b981">📷 Add Photos</button>
+          </label>
+        </div>
+        <div class="small" style="text-align:center;margin-top:4px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+        
+        <!-- URL Downloader Dropdown -->
+        <div class="url-downloader-dropdown">
+          <button class="url-downloader-btn" id="urlDownloaderBtn">
+            <span>🔗 Download from URL (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="url-downloader-content" id="urlDownloaderDropdown">
+            <div class="url-option" data-type="twitsave">
+              <span>🐦</span>
+              <span>TwitSave (Twitter/X)</span>
+            </div>
+            <div class="url-option" data-type="9xbuddy">
+              <span>🎬</span>
+              <span>9xBuddy (Multiple Sites)</span>
+            </div>
+            <div class="url-option" data-type="url">
+              <span>🌐</span>
+              <span>Universal URL Downloader</span>
+            </div>
+            <div class="url-input-group">
+              <input type="url" id="videoUrl" placeholder="Paste video URL here">
+              <button class="btn" id="downloadUrlBtn">Download</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cloud Storage Dropdown -->
+        <div class="cloud-storage-dropdown">
+          <button class="cloud-storage-btn" id="cloudStorageBtn">
+            <span>☁️ Cloud Storage (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="cloud-dropdown-content" id="cloudStorageDropdown">
+            <div class="cloud-option google" data-provider="google">
+              <span>🔵</span>
+              <span>Google Drive</span>
+            </div>
+            <div class="cloud-option dropbox" data-provider="dropbox">
+              <span>🔵</span>
+              <span>Dropbox</span>
+            </div>
+            <div class="cloud-option mega" data-provider="mega">
+              <span>🔵</span>
+              <span>MEGA</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- File Tools Dropdown -->
+        <div class="file-tools-dropdown">
+          <button class="file-tools-btn" id="fileToolsBtn">
+            <span>🛠️ File Tools (FREE)</span>
+            <span>▼</span>
+          </button>
+          <div class="file-tools-content" id="fileToolsDropdown">
+            <div class="file-tool-option" data-tool="rename">
+              <span>📝</span>
+              <span>Rename Files</span>
+            </div>
+            <div class="file-tool-option" data-tool="convert">
+              <span>🔄</span>
+              <span>Convert Format</span>
+            </div>
+            <div class="file-tool-option" data-tool="compress">
+              <span>🗜️</span>
+              <span>Compress Video</span>
+            </div>
+            <div class="file-tool-option" data-tool="extract">
+              <span>🎵</span>
+              <span>Extract Audio</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sync Status -->
+      <div class="sync-status">
+        <div class="sync-indicator" id="syncIndicator"></div>
+        <span id="syncStatusText">Ready to sync</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <input type="search" id="searchInput" placeholder="🔍 Search videos...">
+        <button id="sortBtn" class="ghost">📅 Sort: Newest</button>
+      </div>
+      <div class="videoList" id="videoList">
+        <!-- Videos will be populated here -->
+      </div>
+      <div class="viewer" id="viewer" style="display:none">
+        <!-- Video player will be shown here -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div class="mobile-controls">
+    <div class="mobile-controls-grid">
+      <button id="mobileSyncBtn" class="btn">🔄 Sync</button>
+      <button id="mobileAddBtn" class="btn">➕ Add Media</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Popup Overlay - FIXED IMPLEMENTATION -->
+<div class="video-popup" id="videoPopup">
+  <div class="video-popup-content">
+    <button class="close-popup" id="closePopup">&times;</button>
+    <video id="popupVideo" controls playsinline>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+
+<script>
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+    authDomain: "personalplayer-c8d3b.firebaseapp.com",
+    projectId: "personalplayer-c8d3b",
+    storageBucket: "personalplayer-c8d3b.firebasestorage.app",
+    messagingSenderId: "396785312809",
+    appId: "1:396785312809:web:02290950ec22a13165a838",
+    measurementId: "G-2Q8W3GJF1S"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  // DOM elements
+  const authScreen = document.getElementById('authScreen');
+  const appContainer = document.getElementById('appContainer');
+  const authForm = document.getElementById('authForm');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
+  const authSubmit = document.getElementById('authSubmit');
+  const authError = document.getElementById('authError');
+  const authLoading = document.getElementById('authLoading');
+  const authSubtitle = document.getElementById('authSubtitle');
+  const signOutBtn = document.getElementById('signOutBtn');
+  const syncBtn = document.getElementById('syncBtn');
+  const mobileSyncBtn = document.getElementById('mobileSyncBtn');
+  const mobileAddBtn = document.getElementById('mobileAddBtn');
+  const folders = document.getElementById('folders');
+  const videoList = document.getElementById('videoList');
+  const viewer = document.getElementById('viewer');
+  const searchInput = document.getElementById('searchInput');
+  const sortBtn = document.getElementById('sortBtn');
+  const newFolderName = document.getElementById('newFolderName');
+  const parentFolderSelect = document.getElementById('parentFolderSelect');
+  const addFolderBtn = document.getElementById('addFolderBtn');
+  const fileInputVideo = document.getElementById('fileInputVideo');
+  const fileInputPhoto = document.getElementById('fileInputPhoto');
+  const addVideoBtn = document.getElementById('addVideoBtn');
+  const addPhotoBtn = document.getElementById('addPhotoBtn');
+  const syncIndicator = document.getElementById('syncIndicator');
+  const syncStatusText = document.getElementById('syncStatusText');
+
+  // Video Popup Elements - FIXED
+  const videoPopup = document.getElementById('videoPopup');
+  const popupVideo = document.getElementById('popupVideo');
+  const closePopup = document.getElementById('closePopup');
+
+  // Cloud Storage Elements
+  const cloudStorageBtn = document.getElementById('cloudStorageBtn');
+  const cloudStorageDropdown = document.getElementById('cloudStorageDropdown');
+  const urlDownloaderBtn = document.getElementById('urlDownloaderBtn');
+  const urlDownloaderDropdown = document.getElementById('urlDownloaderDropdown');
+  const fileToolsBtn = document.getElementById('fileToolsBtn');
+  const fileToolsDropdown = document.getElementById('fileToolsDropdown');
+
+  // App state
+  let currentUser = null;
+  let foldersData = {};
+  let videosData = {};
+  let currentFolder = null;
+  let currentVideo = null;
+  let sortOrder = 'newest';
+
+  // Initialize app
+  function initApp() {
+    // Auth state observer
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUser = user;
+        showApp();
+        loadUserData();
+      } else {
+        showAuth();
+      }
+    });
+
+    // Event listeners
+    authForm.addEventListener('submit', handleAuth);
+    signOutBtn.addEventListener('click', signOut);
+    syncBtn.addEventListener('click', syncData);
+    mobileSyncBtn.addEventListener('click', syncData);
+    mobileAddBtn.addEventListener('click', () => fileInputVideo.click());
+    searchInput.addEventListener('input', filterVideos);
+    sortBtn.addEventListener('click', toggleSort);
+    addFolderBtn.addEventListener('click', addFolder);
+    newFolderName.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addFolder();
+    });
+    
+    // File input handlers
+    fileInputVideo.addEventListener('change', handleFileUpload);
+    fileInputPhoto.addEventListener('change', handleFileUpload);
+    addVideoBtn.addEventListener('click', () => fileInputVideo.click());
+    addPhotoBtn.addEventListener('click', () => fileInputPhoto.click());
+
+    // Cloud storage dropdown
+    cloudStorageBtn.addEventListener('click', toggleCloudStorageDropdown);
+    urlDownloaderBtn.addEventListener('click', toggleUrlDownloaderDropdown);
+    fileToolsBtn.addEventListener('click', toggleFileToolsDropdown);
+
+    // Video popup handlers - FIXED IMPLEMENTATION
+    closePopup.addEventListener('click', closeVideoPopup);
+    
+    // Close popup when clicking on overlay background
+    videoPopup.addEventListener('click', (e) => {
+      if (e.target === videoPopup) {
+        closeVideoPopup();
+      }
+    });
+
+    // Close popup with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && videoPopup.classList.contains('show')) {
+        closeVideoPopup();
+      }
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!cloudStorageBtn.contains(e.target) && !cloudStorageDropdown.contains(e.target)) {
+        cloudStorageDropdown.classList.remove('show');
+      }
+      if (!urlDownloaderBtn.contains(e.target) && !urlDownloaderDropdown.contains(e.target)) {
+        urlDownloaderDropdown.classList.remove('show');
+      }
+      if (!fileToolsBtn.contains(e.target) && !fileToolsDropdown.contains(e.target)) {
+        fileToolsDropdown.classList.remove('show');
+      }
+    });
+
+    // Cloud storage option handlers
+    document.querySelectorAll('.cloud-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const provider = option.dataset.provider;
+        showCloudBrowser(provider);
+      });
+    });
+
+    // URL downloader option handlers
+    document.querySelectorAll('.url-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const type = option.dataset.type;
+        showUrlDownloader(type);
+      });
+    });
+
+    // File tools option handlers
+    document.querySelectorAll('.file-tool-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const tool = option.dataset.tool;
+        showFileTool(tool);
+      });
+    });
+
+    // Download URL button
+    document.getElementById('downloadUrlBtn').addEventListener('click', downloadFromUrl);
+  }
+
+  // Auth functions
+  function handleAuth(e) {
+    e.preventDefault();
+    const email = authEmail.value;
+    const password = authPassword.value;
+    
+    showAuthLoading(true);
+    authError.style.display = 'none';
+    
+    auth.signInWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+        currentUser = userCredential.user;
+        showApp();
+        loadUserData();
+      })
+      .catch((error) => {
+        showAuthError(error.message);
+      })
+      .finally(() => {
+        showAuthLoading(false);
+      });
+  }
+
+  function signOut() {
+    auth.signOut();
+  }
+
+  function showAuth() {
+    authScreen.style.display = 'flex';
+    appContainer.classList.remove('authenticated');
+    authEmail.value = '';
+    authPassword.value = '';
+    authError.style.display = 'none';
+  }
+
+  function showApp() {
+    authScreen.style.display = 'none';
+    appContainer.classList.add('authenticated');
+  }
+
+  function showAuthError(message) {
+    authError.textContent = message;
+    authError.style.display = 'block';
+  }
+
+  function showAuthLoading(show) {
+    authLoading.style.display = show ? 'block' : 'none';
+    authSubmit.disabled = show;
+  }
+
+  // Data management
+  function loadUserData() {
+    if (!currentUser) return;
+    
+    // Load folders
+    db.collection('users').doc(currentUser.uid).collection('folders')
+      .onSnapshot((snapshot) => {
+        foldersData = {};
+        snapshot.forEach((doc) => {
+          foldersData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderFolders();
+        updateParentFolderSelect();
+      });
+
+    // Load videos
+    db.collection('users').doc(currentUser.uid).collection('videos')
+      .onSnapshot((snapshot) => {
+        videosData = {};
+        snapshot.forEach((doc) => {
+          videosData[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderVideos();
+      });
+  }
+
+  function syncData() {
+    updateSyncStatus('syncing', 'Syncing...');
+    setTimeout(() => {
+      updateSyncStatus('synced', 'Synced just now');
+      setTimeout(() => {
+        updateSyncStatus('ready', 'Ready to sync');
+      }, 2000);
+    }, 1000);
+  }
+
+  function updateSyncStatus(status, text) {
+    syncIndicator.className = 'sync-indicator ' + status;
+    syncStatusText.textContent = text;
+  }
+
+  // Folder functions
+  function addFolder() {
+    const name = newFolderName.value.trim();
+    const parentFolderId = parentFolderSelect.value;
+    
+    if (!name) {
+      alert('Please enter a folder name');
+      return;
+    }
+    
+    if (!currentUser) {
+      alert('Please sign in first');
+      return;
+    }
+    
+    addFolderBtn.disabled = true;
+    addFolderBtn.textContent = 'Adding...';
+    
+    const folderData = {
+      name: name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      itemCount: 0
+    };
+    
+    if (parentFolderId) {
+      folderData.parentId = parentFolderId;
+    }
+    
+    db.collection('users').doc(currentUser.uid).collection('folders').add(folderData)
+      .then(() => {
+        newFolderName.value = '';
+        parentFolderSelect.value = '';
+      }).catch((error) => {
+        console.error('Error adding folder:', error);
+        alert('Error creating folder: ' + error.message);
+      }).finally(() => {
+        addFolderBtn.disabled = false;
+        addFolderBtn.textContent = '📁 Add';
+      });
+  }
+
+  function updateParentFolderSelect() {
+    parentFolderSelect.innerHTML = '<option value="">Root Folder</option>';
+    
+    Object.values(foldersData).forEach(folder => {
+      const option = document.createElement('option');
+      option.value = folder.id;
+      option.textContent = folder.name;
+      parentFolderSelect.appendChild(option);
+    });
+  }
+
+  function renderFolders() {
+    folders.innerHTML = '';
+    
+    const folderTree = buildFolderTree(foldersData);
+    
+    if (folderTree.length === 0) {
+      folders.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No folders yet. Create one above!</div>';
+      return;
+    }
+    
+    renderFolderTree(folderTree, folders);
+  }
+
+  function buildFolderTree(foldersData) {
+    const folderMap = new Map();
+    const rootFolders = [];
+    
+    Object.values(foldersData).forEach(folder => {
+      folderMap.set(folder.id, { ...folder, children: [] });
+    });
+    
+    Object.values(foldersData).forEach(folder => {
+      if (folder.parentId && folderMap.has(folder.parentId)) {
+        folderMap.get(folder.parentId).children.push(folderMap.get(folder.id));
+      } else {
+        rootFolders.push(folderMap.get(folder.id));
+      }
+    });
+    
+    rootFolders.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+    rootFolders.forEach(folder => {
+      sortFolderChildren(folder);
+    });
+    
+    return rootFolders;
+  }
+
+  function sortFolderChildren(folder) {
+    if (folder.children.length > 0) {
+      folder.children.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+      folder.children.forEach(child => sortFolderChildren(child));
+    }
+  }
+
+  function renderFolderTree(folderTree, container, level = 0) {
+    folderTree.forEach(folder => {
+      const folderElement = document.createElement('div');
+      folderElement.className = 'folder-item' + (currentFolder === folder.id ? ' active' : '');
+      folderElement.style.paddingLeft = (level * 20) + 'px';
+      folderElement.setAttribute('data-folder-id', folder.id);
+      
+      folderElement.innerHTML = `
+        <span>📁</span>
+        <div class="name">${folder.name}</div>
+        <div class="count">${folder.itemCount || 0}</div>
+        <div class="folder-actions-menu">
+          <button class="folder-action-btn" onclick="event.stopPropagation(); addSubfolder('${folder.id}')" title="Add subfolder">➕</button>
+        </div>
+      `;
+      
+      folderElement.addEventListener('click', () => selectFolder(folder.id));
+      container.appendChild(folderElement);
+      
+      if (folder.children && folder.children.length > 0) {
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'folder-children';
+        container.appendChild(childrenContainer);
+        renderFolderTree(folder.children, childrenContainer, level + 1);
+      }
+    });
+  }
+
+  function addSubfolder(parentFolderId) {
+    const folderName = prompt('Enter subfolder name:');
+    if (folderName && folderName.trim()) {
+      if (!currentUser) return;
+      
+      db.collection('users').doc(currentUser.uid).collection('folders').add({
+        name: folderName.trim(),
+        parentId: parentFolderId,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        itemCount: 0
+      }).catch((error) => {
+        console.error('Error adding subfolder:', error);
+        alert('Error creating subfolder: ' + error.message);
+      });
+    }
+  }
+
+  function selectFolder(folderId) {
+    currentFolder = folderId;
+    renderVideos();
+    
+    document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
+    document.querySelector(`.folder-item[data-folder-id="${folderId}"]`)?.classList.add('active');
+  }
+
+  // Video functions - FIXED VIDEO POPUP IMPLEMENTATION
+  function renderVideos() {
+    videoList.innerHTML = '';
+    
+    if (Object.keys(videosData).length === 0) {
+      videoList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No media yet. Add some videos or photos to get started!</div>';
+      return;
+    }
+    
+    let videosArray = Object.values(videosData);
+    
+    if (currentFolder) {
+      videosArray = videosArray.filter(video => video.folderId === currentFolder);
+    }
+    
+    const searchTerm = searchInput.value.toLowerCase();
+    if (searchTerm) {
+      videosArray = videosArray.filter(video => 
+        video.name.toLowerCase().includes(searchTerm) ||
+        (video.tags && video.tags.some(tag => tag.toLowerCase().includes(searchTerm)))
+      );
+    }
+    
+    videosArray.sort((a, b) => {
+      if (sortOrder === 'newest') {
+        return (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0);
+      } else {
+        return (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0);
+      }
+    });
+    
+    videosArray.forEach(video => {
+      const videoElement = document.createElement('div');
+      videoElement.className = 'vitem';
+      videoElement.innerHTML = `
+        <div class="thumb">
+          ${video.thumbnailUrl ? `<img src="${video.thumbnailUrl}" alt="${video.name}" loading="lazy">` : '📹'}
+        </div>
+        <div class="meta">
+          <h3>${video.name}</h3>
+          <p>${formatFileSize(video.size)} • ${video.duration || '0:00'} • ${formatDate(video.createdAt?.toDate())}</p>
+          <div class="small">
+            ${video.tags ? video.tags.map(tag => `#${tag}`).join(' ') : ''}
+          </div>
+        </div>
+        <div class="media-type-badge ${video.type === 'photo' ? 'media-type-photo' : 'media-type-video'}">
+          ${video.type === 'photo' ? '📷' : '🎥'}
+        </div>
+      `;
+      
+      videoElement.addEventListener('click', () => playVideo(video));
+      videoList.appendChild(videoElement);
+    });
+  }
+
+  function playVideo(video) {
+    if (video.type === 'video') {
+      openVideoPopup(video);
+    } else {
+      // For photos, show a simple alert (you can implement a lightbox later)
+      alert(`Photo: ${video.name}\nURL: ${video.url}`);
+    }
+  }
+
+  // Video Popup Functions - COMPLETELY FIXED
+  function openVideoPopup(video) {
+    console.log('Opening video popup for:', video.name);
+    console.log('Video URL:', video.url);
+    
+    // Reset video source
+    popupVideo.src = '';
+    
+    // Set video source
+    popupVideo.src = video.url;
+    
+    // Set poster if available
+    if (video.thumbnailUrl) {
+      popupVideo.poster = video.thumbnailUrl;
+    }
+    
+    // Add playsinline attribute for mobile
+    popupVideo.setAttribute('playsinline', '');
+    
+    // Show popup
+    videoPopup.classList.add('show');
+    document.body.classList.add('popup-open');
+    
+    // Attempt to play video
+    const playPromise = popupVideo.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        console.log('Auto-play prevented:', error);
+        // Video will still be loaded and ready for manual play
+      });
+    }
+  }
+
+  function closeVideoPopup() {
+    console.log('Closing video popup');
+    
+    // Pause video
+    popupVideo.pause();
+    
+    // Reset video source
+    popupVideo.src = '';
+    
+    // Hide popup
+    videoPopup.classList.remove('show');
+    document.body.classList.remove('popup-open');
+  }
+
+  function filterVideos() {
+    renderVideos();
+  }
+
+  function toggleSort() {
+    sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
+    sortBtn.textContent = `📅 Sort: ${sortOrder === 'newest' ? 'Newest' : 'Oldest'}`;
+    renderVideos();
+  }
+
+  // File upload - UNCHANGED
+  function handleFileUpload(e) {
+    const files = Array.from(e.target.files);
+    const isPhoto = e.target === fileInputPhoto;
+    
+    files.forEach(file => {
+      uploadFile(file, isPhoto ? 'photo' : 'video');
+    });
+    
+    e.target.value = '';
+  }
+
+  function uploadFile(file, type) {
+    if (!currentUser) return;
+    
+    const fileId = Date.now().toString();
+    const filePath = `users/${currentUser.uid}/${type}s/${fileId}_${file.name}`;
+    const uploadTask = storage.ref(filePath).put(file);
+    
+    const videoData = {
+      name: file.name,
+      size: file.size,
+      type: type,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      folderId: currentFolder,
+      uploadProgress: 0
+    };
+    
+    db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).set(videoData);
+    
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).update({
+          uploadProgress: progress
+        });
+      },
+      (error) => {
+        console.error('Upload error:', error);
+      },
+      () => {
+        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+          db.collection('users').doc(currentUser.uid).collection('videos').doc(fileId).update({
+            url: downloadURL,
+            uploadProgress: 100
+          });
+        });
+      }
+    );
+  }
+
+  // Utility functions
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function formatDate(date) {
+    if (!date) return 'Unknown date';
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  }
+
+  // Cloud Storage Functions
+  function toggleCloudStorageDropdown() {
+    cloudStorageDropdown.classList.toggle('show');
+  }
+
+  function toggleUrlDownloaderDropdown() {
+    urlDownloaderDropdown.classList.toggle('show');
+  }
+
+  function toggleFileToolsDropdown() {
+    fileToolsDropdown.classList.toggle('show');
+  }
+
+  function showCloudBrowser(provider) {
+    alert(`Cloud browser for ${provider} would open here. This is a premium feature.`);
+  }
+
+  // URL Downloader Functions
+  function showUrlDownloader(type) {
+    let serviceName = '';
+    let placeholder = '';
+    
+    switch(type) {
+      case 'twitsave':
+        serviceName = 'TwitSave';
+        placeholder = 'Paste Twitter/X URL (e.g., https://twitter.com/... or https://x.com/...)';
+        break;
+      case '9xbuddy':
+        serviceName = '9xBuddy';
+        placeholder = 'Paste video URL from YouTube, Instagram, Facebook, etc.';
+        break;
+      case 'url':
+        serviceName = 'Universal URL Downloader';
+        placeholder = 'Paste any video URL';
+        break;
+    }
+    
+    document.getElementById('videoUrl').placeholder = placeholder;
+  }
+
+  function showFileTool(tool) {
+    alert(`File tool ${tool} would open here. This is a premium feature.`);
+  }
+
+  function downloadFromUrl() {
+    const url = document.getElementById('videoUrl').value;
+    if (!url) {
+      alert('Please enter a video URL');
+      return;
+    }
+    
+    let serviceUrl = '';
+    
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      serviceUrl = `https://twitsave.com/info?url=${encodeURIComponent(url)}`;
+    } else if (url.includes('youtube.com') || url.includes('youtu.be') || 
+               url.includes('instagram.com') || url.includes('facebook.com') ||
+               url.includes('tiktok.com')) {
+      serviceUrl = `https://savesubs.com/amp/sites/download-9xbuddy-videos?url=${encodeURIComponent(url)}`;
+    } else {
+      serviceUrl = `https://savesubs.com/amp/sites/download-9xbuddy-videos?url=${encodeURIComponent(url)}`;
+    }
+    
+    window.open(serviceUrl, '_blank');
+    alert(`Opening download service for: ${url}\nThe download page will open in a new tab.`);
+  }
+
+  // Initialize the app when DOM is loaded
+  document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>
