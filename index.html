@@ -1,98 +1,133 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>MediaTracker Pro — Upload.io + LocalStorage</title>
-<!-- Build 2025-10-12 | Fixed buttons + syntax | Upload.io storage | LocalStorage persistence | FixTweet preview | Progress bars | Drag/Drop + Trash -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MediaTracker Pro — Permanent Links (Upload.io + LocalStorage)</title>
+<!-- Build: 2025-10-12 → Permanent URLs for videos & photos, FixTweet manual download, Drive-style viewer, retry-on-fail -->
 <style>
-/* ====== STYLES (same visuals, functional buttons) ====== */
-:root{--bg:#0b1220;--card:#0f1724;--card2:#141b2b;--txt:#e6eef9;--muted:rgba(230,238,249,.65);--acc:#7c3aed;--accH:#6d28d9;--thin:rgba(255,255,255,.15);--secBG:rgba(255,255,255,.03);--secBD:rgba(255,255,255,.08)}
+:root{--bg:#0b1220;--card:#0f1724;--card2:#141b2b;--txt:#e6eef9;--muted:rgba(230,238,249,.7);--acc:#7c3aed;--accH:#6d28d9;--thin:rgba(255,255,255,.15);--secBG:rgba(255,255,255,.03);--secBD:rgba(255,255,255,.08)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica Neue,Arial}
-header{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:12px 16px}
-.title{margin:0;font-weight:700;font-size:18px;letter-spacing:.2px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:42px;padding:10px 16px;border-radius:8px;border:none;font-weight:600;color:#fff;background:var(--acc);cursor:pointer;text-decoration:none;transition:background .2s,transform .1s}
+header{position:sticky;top:0;z-index:40;display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:12px 16px;border-bottom:1px solid var(--thin)}
+.title{margin:0;font-weight:800;font-size:18px;letter-spacing:.2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:42px;padding:10px 16px;border-radius:10px;border:1px solid transparent;font-weight:700;color:#fff;background:var(--acc);cursor:pointer;text-decoration:none;transition:background .15s,transform .08s}
 .btn:hover{background:var(--accH);transform:translateY(-1px)}
-.btn-matte{background:var(--card);color:var(--txt);border:1px solid var(--thin)}
-.btn-matte:hover{background:#1a2333}
+.btn-ghost{background:var(--card);border-color:var(--thin);color:var(--txt)}
 .container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
 @media(max-width:900px){.container{grid-template-columns:1fr}}
 .sidebar,.main{background:var(--card);padding:12px;border-radius:12px}
-input,select,textarea{width:100%;padding:8px 10px;background:var(--card2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--txt);font-size:14px}
-input::placeholder,textarea::placeholder{color:rgba(230,238,249,.6)}
-.section{background:var(--secBG);border:1px solid var(--secBD);border-radius:10px;padding:12px;margin-bottom:16px}
-.section h3{margin:0 0 8px;font-size:15px;color:var(--acc);font-weight:700}
+.section{background:var(--secBG);border:1px solid var(--secBD);border-radius:12px;padding:12px;margin-bottom:14px}
+.section h3{margin:0 0 8px;font-size:15px;color:var(--acc);font-weight:800}
 .row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.row:last-child{margin-bottom:0}
+input,textarea{width:100%;padding:10px 12px;background:var(--card2);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--txt);font-size:14px}
+input::placeholder{color:rgba(230,238,249,.6)}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.7);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.7)}70%{box-shadow:0 0 0 12px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 .empty{font-size:13px;color:var(--muted);text-align:center}
+/* Folders */
 .folders{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto;padding-right:4px}
 .frow{position:relative;display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background:rgba(255,255,255,.02)}
 .frow:hover{background:rgba(255,255,255,.05)}
-.fchev{width:16px;text-align:center;opacity:.8;transition:transform .2s ease}
+.fchev{width:16px;text-align:center;opacity:.8;transition:transform .15s}
 .frow.expanded>.fchev{transform:rotate(90deg)}
-.fctrl{position:absolute;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .2s ease}
+.fname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fctrl{position:absolute;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .15s}
 .frow:hover .fctrl{opacity:1}
-.fctrl button{background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--txt);border-radius:6px;height:28px;padding:0 8px;cursor:pointer}
-.children{overflow:hidden;max-height:0;opacity:.0;transition:max-height .25s ease,opacity .25s ease}
+.fctrl button{background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--txt);border-radius:8px;height:28px;padding:0 8px;cursor:pointer}
+.children{overflow:hidden;max-height:0;opacity:.0;transition:max-height .23s ease,opacity .23s ease}
 .children.show{opacity:1}
+/* Video list */
 .videoList{display:flex;flex-direction:column;gap:8px}
-.vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,.02);cursor:grab;transition:background .2s}
+.vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.02);cursor:grab;transition:background .15s}
 .vitem:hover{background:rgba(255,255,255,.05)}
-.thumb{width:120px;height:72px;background:#000;border-radius:8px;overflow:hidden;flex-shrink:0}
+.vitem[draggable=true]{user-select:none}
+.thumb{width:120px;height:72px;background:#000;border-radius:10px;overflow:hidden;flex-shrink:0}
 .thumb img,.thumb video{width:100%;height:100%;object-fit:cover}
 .meta{flex:1;min-width:0}
 .meta h4{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.meta p{margin:4px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);animation:fade .6s ease}
-.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.7);animation:pulse 1.6s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.7)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-@keyframes fade{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-
-/* Viewer */
-.viewer-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:1000;}
-.viewer-full.show{display:block;opacity:1;pointer-events:auto;}
-.viewer-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;}
-.viewer-video{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 0 60px rgba(0,0,0,.6)}
-.viewer-toolbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,0));color:#e6eef9;transition:opacity .2s ease;}
-.viewer-close{position:absolute;top:12px;right:12px;font-size:28px;font-weight:700;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.viewer-close:hover{background:rgba(255,255,255,.2)}
-.viewer-title{font-weight:600;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.viewer-actions{display:flex;gap:10px;align-items:center}
-.viewer-dl,.viewer-back{height:36px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
-.viewer-dl:hover,.viewer-back:hover{background:rgba(255,255,255,.18)}
-.viewer-idle .viewer-toolbar{opacity:0}
-.viewer-idle{cursor:none}
-
-/* Trash & progress */
-.trashOv{position:absolute;left:16px;right:16px;bottom:24px;padding:14px;background:rgba(239,68,68,.08);border:2px dashed rgba(239,68,68,.6);border-radius:12px;text-align:center;color:#ef4444;font-weight:600;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;backdrop-filter:blur(6px)}
-.trashOv.active{opacity:1;transform:translateY(-6px)}
-.upload-progress{height:5px;background:rgba(255,255,255,.1);border-radius:10px;overflow:hidden;margin-top:6px}
+.meta p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.upload-progress{height:5px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:6px}
 .upload-progress .bar{width:0%;height:100%;background:var(--acc);transition:width .2s ease}
-.fade-out-preview{opacity:0;transition:opacity .8s ease}
+.fade-out{opacity:0;transition:opacity .5s ease}
+/* Drive-style Viewer */
+.viewer-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:1000}
+.viewer-full.show{display:block;opacity:1;pointer-events:auto}
+.viewer-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
+.viewer-video{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 0 60px rgba(0,0,0,.6)}
+.viewer-toolbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,0));color:#e6eef9;transition:opacity .2s}
+.viewer-title{font-weight:700;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer-dl,.viewer-back{height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+.viewer-dl:hover,.viewer-back:hover{background:rgba(255,255,255,.18)}
+.viewer-close{position:absolute;top:12px;right:12px;font-size:28px;font-weight:800;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.viewer-close:hover{background:rgba(255,255,255,.2)}
+.viewer-idle .viewer-toolbar{opacity:0}
+/* Retry overlay */
+.retry-wrap{position:absolute;inset:auto auto 24px 24px;display:none}
+.retry-btn{height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+.retry-btn:hover{background:rgba(255,255,255,.18)}
+/* Floating Trash Overlay */
+.trashOv{position:absolute;left:16px;right:16px;bottom:24px;padding:14px;background:rgba(239,68,68,.08);border:2px dashed rgba(239,68,68,.6);border-radius:12px;text-align:center;color:#ef4444;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+.trashOv.active{opacity:1;transform:translateY(-6px);pointer-events:auto}
+.trashOv.drag-over{background:rgba(239,68,68,.14)}
 </style>
 </head>
-
 <body>
 <header>
   <h1 class="title">📱 MediaTracker Pro</h1>
-  <div style="display:flex;gap:8px">
-    <a href="stats.html" class="btn btn-matte">📊 Stats</a>
-  </div>
+  <a href="stats.html" class="btn btn-ghost">📊 Stats</a>
 </header>
-
 <div class="container">
-  <aside class="sidebar" id="sidebar" style="position:relative">
+  <aside class="sidebar" style="position:relative">
     <div class="section"><div class="status"><span class="dot"></span><span>Local mode: Upload.io + LocalStorage</span></div></div>
-    <div class="section"><h3>📁 Folder Management</h3><div class="row"><input id="newFolderName" placeholder="New folder name"></div><button id="addFolderBtn" class="btn" style="width:100%">📁 Add Folder</button></div>
-    <div class="section"><h3>📂 Your Folders</h3><div id="folders" class="folders"><div class="empty" id="noFolders">No folders yet. Create one above!</div></div></div>
-    <div class="section"><h3>➕ Add Media</h3><div class="row"><button id="addVideoBtn" class="btn" style="flex:1">🎥 Add Videos</button><button id="addPhotoBtn" class="btn" style="flex:1;background:#10b981">📷 Add Photos</button></div><div class="empty" style="margin-top:6px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div></div>
-    <div class="section"><h3>🐦 Twitter/X Downloader</h3><div class="row"><input id="twUrl" placeholder="Paste Twitter/X URL here"></div><div class="row"><button id="twFetch" class="btn" style="width:100%">Fetch Twitter Media</button></div></div>
-    <div id="tweetPreviewSection" class="section" style="display:none;"><h3>🎞️ Tweet Media Preview</h3><div id="tweetPreview" class="vitem" style="cursor:default;"><div class="thumb"><video id="tweetPreviewVideo" muted autoplay loop playsinline></video></div><div class="meta"><h4 id="tweetPreviewTitle">Previewing Tweet Media…</h4><p>Detected video • Ready to download</p></div></div><button id="tweetDownloadBtn" class="btn" style="width:100%;margin-top:10px;">⬇️ Download to VideoList</button></div>
+
+    <div class="section">
+      <h3>📁 Folder Management</h3>
+      <div class="row"><input id="newFolderName" placeholder="New folder name"/></div>
+      <button id="addFolderBtn" class="btn" style="width:100%">📁 Add Folder</button>
+    </div>
+
+    <div class="section">
+      <h3>📂 Your Folders</h3>
+      <div id="folders" class="folders"><div class="empty" id="noFolders">No folders yet. Create one above!</div></div>
+    </div>
+
+    <div class="section">
+      <h3>➕ Add Media</h3>
+      <div class="row">
+        <button id="addVideoBtn" class="btn" style="flex:1">🎥 Add Videos</button>
+        <button id="addPhotoBtn" class="btn" style="flex:1;background:#10b981">📷 Add Photos</button>
+      </div>
+      <div class="empty" style="margin-top:6px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+    </div>
+
+    <div class="section">
+      <h3>🐦 Twitter/X Downloader</h3>
+      <div class="row"><input id="twUrl" placeholder="Paste Twitter/X URL here"/></div>
+      <div class="row"><button id="twFetch" class="btn" style="width:100%">Fetch Twitter Media</button></div>
+    </div>
+
+    <div id="tweetPreviewSection" class="section" style="display:none;">
+      <h3>🎞️ Tweet Media Preview</h3>
+      <div class="vitem" style="cursor:default;">
+        <div class="thumb"><video id="tweetPreviewVideo" muted autoplay loop playsinline></video></div>
+        <div class="meta"><h4 id="tweetPreviewTitle">Previewing Tweet Media…</h4><p>Detected video • Ready to upload to permanent link</p></div>
+      </div>
+      <button id="tweetDownloadBtn" class="btn" style="width:100%;margin-top:10px;">⬇️ Download to VideoList</button>
+    </div>
+
     <div id="trashBinOverlay" class="trashOv">🗑️ Drop to Delete Media</div>
   </aside>
 
   <main class="main">
-    <div class="section"><div class="row"><input type="search" id="searchInput" placeholder="🔍 Search videos..."><button id="sortBtn" class="btn">📅 Sort: Newest</button></div></div>
+    <div class="section">
+      <div class="row">
+        <input type="search" id="searchInput" placeholder="🔍 Search media...">
+        <button id="sortBtn" class="btn">📅 Sort: Newest</button>
+      </div>
+    </div>
     <div id="videoList" class="videoList"></div>
   </main>
 </div>
@@ -103,52 +138,199 @@ input::placeholder,textarea::placeholder{color:rgba(230,238,249,.6)}
     <div class="viewer-toolbar">
       <button class="viewer-back" id="viewerBack">← Back</button>
       <div class="viewer-title" id="viewerTitle"></div>
-      <div class="viewer-actions"><a id="viewerDownload" class="viewer-dl" download>⬇️ Download</a></div>
+      <a id="viewerDownload" class="viewer-dl" download>⬇️ Download</a>
     </div>
     <button class="viewer-close" id="closePopup">×</button>
-    <video id="viewerVideo" class="viewer-video" controls playsinline></video>
+    <video id="viewerVideo" class="viewer-video" controls playsinline crossorigin="anonymous"></video>
+    <div class="retry-wrap" id="retryWrap"><button class="retry-btn" id="retryBtn">↻ Retry Play</button></div>
   </div>
 </div>
 
 <script>
-const UPLOAD_IO_KEY="public_G22nhy92HumZ7P23KoW9jdRoXCuN";
-const UPLOAD_ENDPOINT="https://api.upload.io/v1/files/basic";
+/* ===== Upload.io config ===== */
+const UPLOAD_IO_KEY = "public_G22nhy92HumZ7P23KoW9jdRoXCuN"; // your provided public key
+const UPLOAD_ENDPOINT = "https://api.upload.io/v1/files/basic";
 
-let currentFolderId="",sortOrder="newest";
-const foldersMap=new Map(),mediaMap=new Map(),expandedSet=new Set();
-const LS_KEYS={folders:"mtp_folders",media:"mtp_media",expanded:"mtp_expanded"};
-const foldersEl=document.getElementById('folders'),noFolders=document.getElementById('noFolders'),videoListEl=document.getElementById('videoList');
-const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const genId=(p="id")=>p+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
-function saveState(){localStorage.setItem(LS_KEYS.folders,JSON.stringify([...foldersMap.values()]));localStorage.setItem(LS_KEYS.media,JSON.stringify([...mediaMap.values()]));localStorage.setItem(LS_KEYS.expanded,JSON.stringify([...expandedSet]));}
-function loadState(){try{const f=JSON.parse(localStorage.getItem(LS_KEYS.folders)||"[]"),m=JSON.parse(localStorage.getItem(LS_KEYS.media)||"[]"),ex=JSON.parse(localStorage.getItem(LS_KEYS.expanded)||"[]");f.forEach(x=>foldersMap.set(x.id,x));m.forEach(x=>mediaMap.set(x.id,x));ex.forEach(id=>expandedSet.add(id));}catch(e){}}
+/* ===== State ===== */
+let currentFolderId = ""; // shows only media in this folder when set
+let sortOrder = "newest"; // or "oldest"
+const foldersMap = new Map(); // id -> {id,name,parentId,createdAt}
+const mediaMap = new Map();   // id -> {id,name,type,url,folderId,createdAt,local,remoteUrl?}
+const expandedSet = new Set();
+const LS_KEYS = { folders: "mtp_folders", media: "mtp_media", expanded: "mtp_expanded" };
+
+/* ===== DOM ===== */
+const foldersEl = document.getElementById('folders');
+const noFolders = document.getElementById('noFolders');
+const videoListEl = document.getElementById('videoList');
+const viewerEl = document.getElementById('viewer');
+const viewerVid = document.getElementById('viewerVideo');
+const viewerTitleEl = document.getElementById('viewerTitle');
+const viewerDl = document.getElementById('viewerDownload');
+const retryWrap = document.getElementById('retryWrap');
+const retryBtn = document.getElementById('retryBtn');
+
+/* ===== Utils ===== */
+const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const genId = (p="id") => p+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+function saveState(){localStorage.setItem(LS_KEYS.folders, JSON.stringify([...foldersMap.values()]));localStorage.setItem(LS_KEYS.media, JSON.stringify([...mediaMap.values()]));localStorage.setItem(LS_KEYS.expanded, JSON.stringify([...expandedSet]));}
+function loadState(){try{const f=JSON.parse(localStorage.getItem(LS_KEYS.folders)||"[]");const m=JSON.parse(localStorage.getItem(LS_KEYS.media)||"[]");const ex=JSON.parse(localStorage.getItem(LS_KEYS.expanded)||"[]");f.forEach(x=>foldersMap.set(x.id,x));m.forEach(x=>mediaMap.set(x.id,x));ex.forEach(id=>expandedSet.add(id));}catch(e){}}
+
+/* ===== Bootstrapping ===== */
+(function init(){
+  loadState();
+  wireUI();
+  renderFolders();
+  renderVideos();
+})();
 
 function wireUI(){
- document.getElementById('addFolderBtn').onclick=onAddFolder;
- document.getElementById('addVideoBtn').onclick=()=>pickFiles('video');
- document.getElementById('addPhotoBtn').onclick=()=>pickFiles('image');
- document.getElementById('searchInput').oninput=renderVideos;
- document.getElementById('sortBtn').onclick=()=>{sortOrder=sortOrder==='newest'?'oldest':'newest';document.getElementById('sortBtn').textContent=sortOrder==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';renderVideos();};
- document.getElementById('closePopup').onclick=closeViewer;
- document.getElementById('twFetch').onclick=()=>fetchTweet();
- document.getElementById('tweetDownloadBtn').onclick=()=>downloadPreview();
+  document.getElementById('addFolderBtn').onclick = onAddFolder;
+  document.getElementById('addVideoBtn').onclick = () => pickFiles('video');
+  document.getElementById('addPhotoBtn').onclick = () => pickFiles('image');
+  document.getElementById('sortBtn').onclick = ()=>{sortOrder=sortOrder==='newest'?'oldest':'newest';document.getElementById('sortBtn').textContent=sortOrder==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';renderVideos();};
+  document.getElementById('searchInput').oninput = renderVideos;
+  document.getElementById('closePopup').onclick = closeViewer;
+  document.getElementById('viewerBack').onclick = closeViewer;
+  document.getElementById('twFetch').onclick = () => fetchTweet();
+  document.getElementById('tweetDownloadBtn').onclick = () => downloadPreview();
+  retryBtn.onclick = () => retryPlay();
+
+  ['mousemove','mousedown','keypress','touchstart'].forEach(evt=>{
+    viewerEl.addEventListener(evt, ()=>{ if(viewerEl.classList.contains('show')) resetViewerIdle(); }, {passive:true});
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(!viewerEl.classList.contains('show')) return;
+    if(e.key===' '){ e.preventDefault(); if(viewerVid.paused) viewerVid.play(); else viewerVid.pause(); }
+    else if(e.key==='ArrowLeft'){ viewerVid.currentTime = Math.max(0, viewerVid.currentTime - 5); }
+    else if(e.key==='ArrowRight'){ viewerVid.currentTime = Math.min(viewerVid.duration||Infinity, viewerVid.currentTime + 5); }
+    else if(e.key==='Escape'){ closeViewer(); }
+  });
 }
 
-function onAddFolder(){const nf=document.getElementById('newFolderName');const name=(nf.value||'').trim();if(!name)return;const id=genId('fld');foldersMap.set(id,{id,name,parentId:currentFolderId||"",createdAt:Date.now()});nf.value='';renderFolders();saveState();}
-function renderFolders(){const roots=[];foldersMap.forEach(v=>{if(!v.parentId)roots.push(v)});noFolders.style.display=roots.length?"none":"block";const out=[];
- function rowHtml(n,d){const expanded=expandedSet.has(n.id);return `<div class="frow ${expanded?'expanded':'collapsed'}" data-fid="${n.id}" style="padding-left:${8+d*14}px"><span class="fchev">▶</span><span class="fname">📁 ${esc(n.name)}</span><div class="fctrl"><button data-act="add">➕</button><button data-act="ren">✏️</button><button data-act="del">🗑️</button></div></div><div class="children ${expanded?'show':''}" data-ch-of="${n.id}" style="max-height:${expanded?9999:0}px">${childHtml(n.id,d+1)}</div>`;}
- function childHtml(pid,d){let s='';foldersMap.forEach(ch=>{if(ch.parentId===pid)s+=rowHtml(ch,d)});return s;}
- roots.forEach(r=>out.push(rowHtml(r,0)));foldersEl.innerHTML=out.join('');
- foldersEl.querySelectorAll('.frow').forEach(el=>{
-  const id=el.getAttribute('data-fid');
-  el.onclick=e=>{if(e.target.closest('.fctrl'))return;toggleFolder(id)};
-  el.querySelectorAll('.fctrl button').forEach(b=>{
-   b.onclick=ev=>{ev.stopPropagation();const act=b.dataset.act;if(act==='add')inlineAddSub(id,el);if(act==='ren')inlineRename(id,el);if(act==='del')confirmDeleteFolder(id);};
+/* ===== Folders ===== */
+function onAddFolder(){ const nf=document.getElementById('newFolderName'); const name=(nf.value||'').trim(); if(!name) return; const id=genId('fld'); foldersMap.set(id,{id,name,parentId:currentFolderId||"",createdAt:Date.now()}); nf.value=''; renderFolders(); saveState(); }
+function renderFolders(){
+  const roots=[]; foldersMap.forEach(v=>{ if(!v.parentId) roots.push(v) });
+  noFolders.style.display = roots.length ? 'none' : 'block';
+  const out=[];
+  function rowHtml(n,depth){ const expanded=expandedSet.has(n.id); return `<div class="frow ${expanded?'expanded':'collapsed'}" data-fid="${n.id}" style="padding-left:${8+depth*14}px"><span class="fchev">▶</span><span class="fname">📁 ${esc(n.name)}</span><div class="fctrl"><button data-act="add">➕</button><button data-act="ren">✏️</button><button data-act="del">🗑️</button></div></div><div class="children ${expanded?'show':''}" data-ch-of="${n.id}" style="max-height:${expanded?9999:0}px">${childHtml(n.id,depth+1)}</div>`; }
+  function childHtml(pid,depth){ let s=''; foldersMap.forEach(ch=>{ if(ch.parentId===pid){ s+=rowHtml(ch,depth) }}); return s; }
+  roots.forEach(r=>out.push(rowHtml(r,0)));
+  foldersEl.innerHTML = out.join('');
+  foldersEl.querySelectorAll('.frow').forEach(el=>{
+    const id = el.getAttribute('data-fid');
+    el.onclick = e=>{ if(e.target.closest('.fctrl')) return; toggleFolder(id) };
+    el.querySelectorAll('.fctrl button').forEach(b=>{
+      b.onclick = ev=>{ ev.stopPropagation(); const act=b.getAttribute('data-act'); if(act==='add') inlineAddSub(id,el); if(act==='ren') inlineRename(id,el); if(act==='del') confirmDeleteFolder(id); };
+    });
+    el.ondragover = ev=>{ ev.preventDefault(); el.style.outline = `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--acc')}` };
+    el.ondragleave = ()=>{ el.style.outline='none' };
+    el.ondrop = e=>{ e.preventDefault(); el.style.outline='none'; const mid=e.dataTransfer.getData('media-id'); if(mid) moveMediaToFolder(mid,id); };
   });
-  el.ondragover=ev=>{ev.preventDefault();el.style.outline=`1px solid var(--acc)`};
-  el.ondragleave=()=>{el.style.outline='none'};
-  el.ondrop=e=>{e.preventDefault();el.style.outline='none';const mid=e.dataTransfer.getData('media-id');if(mid)moveMediaToFolder(mid,id)};
- });
 }
-function toggleFolder(id){expandedSet.has(id)?expandedSet.delete(id):expandedSet.add(id);renderFolders();renderVideos();saveState();}
-function inlineAddSub(parentId,rowEl){const inp=document.createElement('input');inp.placeholder='New subfolder name';inp.style.marginTop='6px';const wrap=document.createElement('div');wrap.style.paddingLeft='28px';wrap.appendChild(inp);rowEl.insertAdjacentElement('afterend',wrap);inp.focus();const save=()=>{const name=(inp.value||'').trim();wrap.remove();if(!name
+function toggleFolder(id){ if(expandedSet.has(id)) expandedSet.delete(id); else expandedSet.add(id); renderFolders(); renderVideos(); saveState(); }
+function inlineAddSub(parentId,rowEl){ const inp=document.createElement('input'); inp.placeholder='New subfolder name'; inp.style.marginTop='6px'; const wrap=document.createElement('div'); wrap.style.paddingLeft='28px'; wrap.appendChild(inp); rowEl.insertAdjacentElement('afterend',wrap); inp.focus(); const save=()=>{ const name=(inp.value||'').trim(); wrap.remove(); if(!name) return; const id=genId('fld'); foldersMap.set(id,{id,name,parentId,createdAt:Date.now()}); renderFolders(); saveState(); }; inp.onkeydown=e=>{ if(e.key==='Enter') save(); if(e.key==='Escape') wrap.remove() }; inp.onblur=save; }
+function inlineRename(id,rowEl){ const f=foldersMap.get(id); if(!f) return; const nameEl=rowEl.querySelector('.fname'); const cur=f.name; const inp=document.createElement('input'); inp.value=cur; inp.style.maxWidth='70%'; nameEl.replaceWith(inp); inp.focus(); const save=(commit)=>{ const nv=(inp.value||'').trim(); const span=document.createElement('span'); span.className='fname'; span.textContent='📁 '+(commit&&nv?nv:cur); inp.replaceWith(span); if(commit && nv && nv!==cur){ foldersMap.set(id,{...f,name:nv}); renderFolders(); saveState(); } }; inp.onkeydown=e=>{ if(e.key==='Enter') save(true); if(e.key==='Escape') save(false) }; inp.onblur=()=>save(true); }
+function confirmDeleteFolder(id){ if(!confirm('⚠️ Delete this folder and all its contents? This cannot be undone.')) return; deleteFolderRecursive(id); renderFolders(); renderVideos(); saveState(); }
+function deleteFolderRecursive(id){ const toDel=[id]; foldersMap.forEach(f=>{ if(f.parentId===id) toDel.push(f.id)}); for(const fid of toDel){ deleteFolderMedia(fid); foldersMap.delete(fid);} }
+function deleteFolderMedia(fid){ [...mediaMap.values()].forEach(m=>{ if((m.folderId||'')===fid) mediaMap.delete(m.id); }); }
+
+/* ===== Media Handling (Uploads & Permanent URLs) ===== */
+function pickFiles(type){ const input=document.createElement('input'); input.type='file'; input.multiple=true; input.accept = type==='video'?'video/*':'image/*'; input.onchange=e=> handleFiles(Array.from(e.target.files||[]),type); input.click(); }
+async function handleFiles(files,type){ for(const file of files){ await addLocalThenUpload(file,type); } }
+
+async function addLocalThenUpload(file,type){
+  const tmpId = genId('tmp');
+  const local = URL.createObjectURL(file);
+  mediaMap.set(tmpId,{ id:tmpId, name:file.name, type, url:local, local:true, folderId:currentFolderId||"", createdAt:Date.now()});
+  renderVideos(); saveState();
+  try{
+    const {url:permUrl} = await uploadToUploadIO(tmpId,file,type);
+    const m = mediaMap.get(tmpId); if(!m) return;
+    mediaMap.set(tmpId,{...m, url:permUrl, local:false, remoteUrl:permUrl});
+    saveState(); renderVideos();
+  }catch(err){ console.error('Upload failed', err); alert('Upload failed. Check console for details.'); }
+}
+
+function setProgress(tmpId,pct){ const bar=document.querySelector(`[data-mid='${tmpId}'] .upload-progress .bar`); if(bar){ bar.style.width = pct+'%'; } }
+function uploadToUploadIO(tmpId,file,type){ return new Promise((resolve,reject)=>{
+  try{
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData(); formData.append('file', file);
+    xhr.open('POST', UPLOAD_ENDPOINT, true);
+    xhr.setRequestHeader('Authorization', 'Bearer '+UPLOAD_IO_KEY);
+    xhr.upload.onprogress = e=>{ if(e.lengthComputable){ setProgress(tmpId, (e.loaded/e.total)*100 ); } };
+    xhr.onreadystatechange = ()=>{
+      if(xhr.readyState===4){
+        if(xhr.status>=200 && xhr.status<300){
+          try{ const resp=JSON.parse(xhr.responseText||"{}"); const fileUrl = resp.fileUrl || resp.file?.url; if(!fileUrl) throw new Error('No fileUrl');
+            const prog = document.querySelector(`[data-mid='${tmpId}'] .upload-progress`); if(prog){ prog.classList.add('fade-out'); setTimeout(()=>prog.remove(),600); }
+            resolve({url:fileUrl});
+          }catch(e){ reject(e) }
+        }else{ reject(new Error('Upload.io error '+xhr.status)) }
+      }
+    };
+    xhr.send(formData);
+  }catch(e){ reject(e) }
+  }); }
+
+function renderVideos(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+  let items=[...mediaMap.values()];
+  if(currentFolderId) items = items.filter(m=>(m.folderId||'')===currentFolderId);
+  if(q) items = items.filter(m=>(m.name||'').toLowerCase().includes(q));
+  items.sort((a,b)=> sortOrder==='newest' ? (b.createdAt-a.createdAt) : (a.createdAt-b.createdAt));
+  if(!items.length){ videoListEl.innerHTML = currentFolderId?`<div class="empty">No media in "${esc(foldersMap.get(currentFolderId)?.name||'Selected Folder')}" yet.</div>`:'<div class="empty">No media yet. Add some!</div>'; return; }
+  videoListEl.innerHTML = items.map(m=>{
+    const isLocal=!!m.local;
+    const progressHTML=isLocal?`<div class="upload-progress"><div class="bar" style="width:0%"></div></div>`:'';
+    const thumb = m.type==='image' ? `<img src="${m.url}" alt="${esc(m.name)}">` : `<video src="${m.url}" muted playsinline></video>`;
+    return `<div class="vitem" data-mid="${m.id}" draggable="true"><div class="thumb">${thumb}</div><div class="meta"><h4>${m.type==='image'?'🖼️':'🎞️'} ${esc(m.name)}</h4><p>${(m.type||'').toUpperCase()} • ${new Date(m.createdAt).toLocaleString()}</p>${progressHTML}</div></div>`;
+  }).join('');
+  videoListEl.querySelectorAll('.vitem').forEach(el=>{
+    const id=el.getAttribute('data-mid');
+    el.onclick=()=>openViewer(id);
+    el.ondragstart=e=>{ e.dataTransfer.setData('media-id',id); showTrash(true) };
+    el.ondragend=()=>showTrash(false);
+  });
+}
+
+/* ===== Viewer ===== */
+let viewerIdleTimer=null;
+function openViewer(id){ const m=mediaMap.get(id); if(!m) return; setupVideoForPlayback(m); viewerTitleEl.textContent = m.name || 'Media'; viewerDl.href = m.remoteUrl || m.url; viewerDl.setAttribute('download', (m.name||'video.mp4').split('/').pop()); viewerEl.classList.add('show'); resetViewerIdle(); viewerVid.focus(); }
+function closeViewer(){ try{ viewerVid.pause(); viewerVid.removeAttribute('src'); viewerVid.load(); }catch(_){} viewerEl.classList.remove('show'); clearTimeout(viewerIdleTimer); document.body.classList.remove('viewer-idle'); hideRetry(); }
+function resetViewerIdle(){ clearTimeout(viewerIdleTimer); document.body.classList.remove('viewer-idle'); viewerIdleTimer=setTimeout(()=>{ document.body.classList.add('viewer-idle'); }, 3000); }
+
+function setupVideoForPlayback(m){ hideRetry(); viewerVid.loop=true; viewerVid.muted=true; viewerVid.controls=true; viewerVid.crossOrigin='anonymous'; viewerVid.src = (m.remoteUrl || m.url); // permanent when available
+  // Autoplay with fallback
+  const playAttempt = viewerVid.play();
+  if(playAttempt && typeof playAttempt.then==='function'){
+    playAttempt.catch(()=>{ showRetry(); });
+  }
+  // If it never advances time after 2s, offer retry
+  const startT = Date.now(); const onTime = ()=>{ viewerVid.removeEventListener('timeupdate', onTime); }; viewerVid.addEventListener('timeupdate', onTime); setTimeout(()=>{ if(viewerVid.currentTime===0) showRetry(); }, 2000);
+}
+function showRetry(){ retryWrap.style.display='block'; }
+function hideRetry(){ retryWrap.style.display='none'; }
+function retryPlay(){ const curSrc = viewerVid.currentSrc || viewerVid.getAttribute('src'); viewerVid.pause(); viewerVid.removeAttribute('src'); viewerVid.load(); requestAnimationFrame(()=>{ viewerVid.src = curSrc; viewerVid.play().catch(()=>{}); }); }
+
+/* ===== Drag to move & Trash ===== */
+const trash=document.getElementById('trashBinOverlay');
+function moveMediaToFolder(mid,fid){ const m=mediaMap.get(mid); if(!m) return; mediaMap.set(mid,{...m,folderId:fid}); renderVideos(); saveState(); }
+function showTrash(b){ trash.classList.toggle('active', !!b); }
+trash.ondragover = e=>{ e.preventDefault(); trash.classList.add('drag-over') };
+trash.ondragleave = ()=> trash.classList.remove('drag-over');
+trash.ondrop = e=>{ e.preventDefault(); trash.classList.remove('drag-over'); const mid=e.dataTransfer.getData('media-id'); const m=mediaMap.get(mid); if(!m) return; const ok=confirm('⚠️ Delete this media? This cannot be undone.'); if(!ok) return; document.querySelector(`[data-mid='${mid}']`)?.remove(); mediaMap.delete(mid); renderVideos(); saveState(); };
+
+/* ===== FixTweet preview + manual permanent download ===== */
+let currentPreviewUrl = null;
+async function fxGet(tw){ const clean = tw.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i,''); const ep1=`https://api.fxtwitter.com/${clean}`, ep2=`https://api.vxtwitter.com/${clean}`; let r=await fetch(ep1); if(!r.ok) r=await fetch(ep2); const j=await r.json(); if(!j?.tweet) throw new Error('No tweet'); return j; }
+async function fetchTweet(){ const url=(document.getElementById('twUrl').value||'').trim(); if(!url) return; try{ const data=await fxGet(url); const medias=(data.tweet.media?.videos||data.tweet.media?.all||[]); if(!medias?.length) throw new Error('No media'); let best=null; const variants=medias[0].variants||[]; for(const v of variants){ if(/mp4/.test(v.content_type||'')){ if(!best || (+v.bitrate>(+best.bitrate||0))) best=v; } } const src = best?.url || medias[0].url || medias[0].download_url; if(!src) throw new Error('No video URL'); currentPreviewUrl = src; const v=document.getElementById('tweetPreviewVideo'); v.src=src; v.load(); document.getElementById('tweetPreviewSection').style.display='block'; }catch(e){ console.error(e); alert('Failed to fetch tweet media.'); } }
+async function downloadPreview(){ if(!currentPreviewUrl) return; try{ await downloadDisplayUpload(currentPreviewUrl); const preview=document.getElementById('tweetPreviewSection'); preview.style.display='none'; document.getElementById('twUrl').value=''; const v=document.getElementById('tweetPreviewVideo'); v.pause?.(); v.removeAttribute('src'); v.load(); }catch(e){ console.error(e); alert('Download failed.'); } }
+
+/* Download → Upload.io → Permanent URL in list */
+async function downloadDisplayUpload(src){ const res = await fetch(src, {mode:'cors'}); if(!res.ok) throw new Error('fetch fail'); const blob = await res.blob(); const type = /image\//.test(blob.type) ? 'image' : 'video'; const file = new File([blob], `media_${Date.now()}.${type==='image'?'jpg':'mp4'}`, {type: blob.type || (type==='image'?'image/jpeg':'video/mp4')}); await addLocalThenUpload(file, type); }
+</script>
+</body>
+</html>
