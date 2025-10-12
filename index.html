@@ -239,720 +239,158 @@ async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB
 async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}
 async function dbDel(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(id);return new Promise(r=>tx.oncomplete=r)}
 
-// ===== DOM refs
-let foldersContainer, foldersEmpty, newFolderName, addFolderBtn, videoInput, addVideos, photoInput, addPhotos;
-let searchEl, mainEmpty, mainList, sortBtn;
-let viewer, viewerVideo, viewerFilename, viewerClose, ytProgress, ytBuffered, ytPlayed;
-let ytPlay, ytRew, ytFwd, ytTime, ytMute, ytVolume, ytSpeed, ytFS;
-let modalOverlay, modalTitle, modalOK, modalCancel, mediaDelOverlay, mediaDelText, mediaDelOK, mediaDelCancel;
-let tweetUrl, fetchTweet, tweetPreview, tweetMediaBox, saveFromTweet;
-let modalCb=null, mediaDelTargetId=null, tweetFetched={type:null,name:null,blob:null};
-
-// ===== Initialize DOM references
-function initDOMRefs() {
-  foldersContainer=document.getElementById('foldersContainer');
-  foldersEmpty=document.getElementById('foldersEmpty');
-  newFolderName=document.getElementById('newFolderName');
-  addFolderBtn=document.getElementById('addFolder');
-  videoInput=document.getElementById('videoInput');
-  addVideos=document.getElementById('addVideos');
-  photoInput=document.getElementById('photoInput');
-  addPhotos=document.getElementById('addPhotos');
-  searchEl=document.getElementById('search');
-  mainEmpty=document.getElementById('mainEmpty');
-  mainList=document.getElementById('mainList');
-  sortBtn=document.getElementById('sortBtn');
-  // Viewer
-  viewer=document.getElementById('viewer');
-  viewerVideo=document.getElementById('viewerVideo');
-  viewerFilename=document.getElementById('viewerFilename');
-  viewerClose=document.getElementById('viewerClose');
-  ytProgress=document.getElementById('ytProgress');
-  ytBuffered=document.getElementById('ytBuffered');
-  ytPlayed=document.getElementById('ytPlayed');
-  ytPlay=document.getElementById('ytPlay');
-  ytRew=document.getElementById('ytRew');
-  ytFwd=document.getElementById('ytFwd');
-  ytTime=document.getElementById('ytTime');
-  ytMute=document.getElementById('ytMute');
-  ytVolume=document.getElementById('ytVolume');
-  ytSpeed=document.getElementById('ytSpeed');
-  ytFS=document.getElementById('ytFS');
-  // Modal/Delete
-  modalOverlay=document.getElementById('modalOverlay');
-  modalTitle=document.getElementById('modalTitle');
-  modalOK=document.getElementById('modalOK');
-  modalCancel=document.getElementById('modalCancel');
-  mediaDelOverlay=document.getElementById('mediaDelOverlay');
-  mediaDelText=document.getElementById('mediaDelText');
-  mediaDelOK=document.getElementById('mediaDelOK');
-  mediaDelCancel=document.getElementById('mediaDelCancel');
-  // Twitter
-  tweetUrl=document.getElementById('tweetUrl');
-  fetchTweet=document.getElementById('fetchTweet');
-  tweetPreview=document.getElementById('tweetPreview');
-  tweetMediaBox=document.getElementById('tweetMediaBox');
-  saveFromTweet=document.getElementById('saveFromTweet');
-}
+// ===== DOM refs - Initialize immediately at script start
+const foldersContainer=document.getElementById('foldersContainer');
+const foldersEmpty=document.getElementById('foldersEmpty');
+const newFolderName=document.getElementById('newFolderName');
+const addFolderBtn=document.getElementById('addFolder');
+const videoInput=document.getElementById('videoInput');
+const addVideos=document.getElementById('addVideos');
+const photoInput=document.getElementById('photoInput');
+const addPhotos=document.getElementById('addPhotos');
+const searchEl=document.getElementById('search');
+const mainEmpty=document.getElementById('mainEmpty');
+const mainList=document.getElementById('mainList');
+const sortBtn=document.getElementById('sortBtn');
+// Viewer
+const viewer=document.getElementById('viewer');
+const viewerVideo=document.getElementById('viewerVideo');
+const viewerFilename=document.getElementById('viewerFilename');
+const viewerClose=document.getElementById('viewerClose');
+const ytProgress=document.getElementById('ytProgress');
+const ytBuffered=document.getElementById('ytBuffered');
+const ytPlayed=document.getElementById('ytPlayed');
+const ytPlay=document.getElementById('ytPlay');
+const ytRew=document.getElementById('ytRew');
+const ytFwd=document.getElementById('ytFwd');
+const ytTime=document.getElementById('ytTime');
+const ytMute=document.getElementById('ytMute');
+const ytVolume=document.getElementById('ytVolume');
+const ytSpeed=document.getElementById('ytSpeed');
+const ytFS=document.getElementById('ytFS');
+// Modal/Delete
+const modalOverlay=document.getElementById('modalOverlay');
+const modalTitle=document.getElementById('modalTitle');
+const modalOK=document.getElementById('modalOK');
+const modalCancel=document.getElementById('modalCancel');
+let modalCb=null;
+const mediaDelOverlay=document.getElementById('mediaDelOverlay');
+const mediaDelText=document.getElementById('mediaDelText');
+const mediaDelOK=document.getElementById('mediaDelOK');
+const mediaDelCancel=document.getElementById('mediaDelCancel');
+let mediaDelTargetId=null;
+// Twitter
+const tweetUrl=document.getElementById('tweetUrl');
+const fetchTweet=document.getElementById('fetchTweet');
+const tweetPreview=document.getElementById('tweetPreview');
+const tweetMediaBox=document.getElementById('tweetMediaBox');
+const saveFromTweet=document.getElementById('saveFromTweet');
+let tweetFetched={type:null,name:null,blob:null};
 
 // ===== Folders & Items
 function ensureDefaultCollapse(id){ if(state.collapse[id]===undefined){ state.collapse[id]=true; }}
 function buildTree(pid=''){return state.folders.filter(f=>(f.parentId||'')===(pid||'')).map(f=>({...f,children:buildTree(f.id)}));}
-function renderFolders(){
-  if (!foldersContainer) return;
-  const tree=buildTree('');foldersContainer.innerHTML='';
-  foldersEmpty.style.display=state.folders.length?'none':'block';
-  tree.forEach(n=>appendFolderSection(n,true,foldersContainer));
-}
-
-function appendFolderSection(node,isRoot,host){
-  ensureDefaultCollapse(node.id);
-  const section=document.createElement('div');
-  section.className='folder-section';
-  
-  const header=document.createElement('div');
-  header.className='folder-header'+(state.collapse[node.id]?' collapsed':'');
-  header.dataset.id=node.id;
-  
-  const left=document.createElement('div');
-  left.className='folder-left';
-  const chev=document.createElement('span');
-  chev.className='chev';
-  chev.textContent='▾';
-  const title=document.createElement('span');
-  title.className='folder-title';
-  title.textContent='📁 '+node.name;
-  left.append(chev,title);
-  
-  const actions=document.createElement('div');
-  actions.className='folder-actions';
-  
-  const addSub=document.createElement('button');
-  addSub.className='action';
-  addSub.textContent='➕ Sub';
-  addSub.onclick=e=>{
-    e.stopPropagation();
-    openRename('Create subfolder','',val=>{
-      if(!val.trim())return;
-      const f={id:uid('fld'),name:val.trim(),parentId:node.id};
-      state.folders.push(f);
-      ensureDefaultCollapse(f.id);
-      save();
-      renderFolders();
-    });
-  };
-  
-  const ren=document.createElement('button');
-  ren.className='action';
-  ren.textContent='✏️ Rename';
-  ren.onclick=e=>{
-    e.stopPropagation();
-    openRename('Rename folder',node.name,val=>{
-      const f=state.folders.find(x=>x.id===node.id);
-      if(f){f.name=val.trim();save();renderFolders();}
-    })
-  };
-  
-  const del=document.createElement('button');
-  del.className='action';
-  del.textContent='🗑️ Delete';
-  del.onclick=e=>{
-    e.stopPropagation();
-    openConfirm('Delete this folder and all its contents?',()=>{
-      deleteFolder(node.id);
-      save();
-      renderFolders();
-      renderMain();
-    });
-  };
-  
+function renderFolders(){const tree=buildTree('');foldersContainer.innerHTML='';foldersEmpty.style.display=state.folders.length?'none':'block';tree.forEach(n=>appendFolderSection(n,true,foldersContainer));}
+function appendFolderSection(node,isRoot,host){ensureDefaultCollapse(node.id);const section=document.createElement('div');section.className='folder-section';
+  const header=document.createElement('div');header.className='folder-header'+(state.collapse[node.id]?' collapsed':'');header.dataset.id=node.id;
+  const left=document.createElement('div');left.className='folder-left';const chev=document.createElement('span');chev.className='chev';chev.textContent='▾';const title=document.createElement('span');title.className='folder-title';title.textContent='📁 '+node.name;left.append(chev,title);
+  const actions=document.createElement('div');actions.className='folder-actions';
+  const addSub=document.createElement('button');addSub.className='action';addSub.textContent='➕ Sub';addSub.onclick=e=>{e.stopPropagation();openRename('Create subfolder','',val=>{if(!val.trim())return;const f={id:uid('fld'),name:val.trim(),parentId:node.id};state.folders.push(f);ensureDefaultCollapse(f.id);save();renderFolders();});};
+  const ren=document.createElement('button');ren.className='action';ren.textContent='✏️ Rename';ren.onclick=e=>{e.stopPropagation();openRename('Rename folder',node.name,val=>{const f=state.folders.find(x=>x.id===node.id);if(f){f.name=val.trim();save();renderFolders();}})};
+  const del=document.createElement('button');del.className='action';del.textContent='🗑️ Delete';del.onclick=e=>{e.stopPropagation();openConfirm('Delete this folder and all its contents?',()=>{deleteFolder(node.id);save();renderFolders();renderMain();});};
   actions.append(addSub,ren,del);
-  header.append(left,actions);
-  section.appendChild(header);
-  
-  const content=document.createElement('div');
-  content.className='folder-content';
-  if(!state.collapse[node.id]) content.classList.add('open');
-  
-  const list=document.createElement('div');
-  list.className='vlist';
+  header.append(left,actions);section.appendChild(header);
+  const content=document.createElement('div');content.className='folder-content';if(!state.collapse[node.id]) content.classList.add('open');
+  const list=document.createElement('div');list.className='vlist';
   const items=Object.values(state.media).filter(m=>(m.folderId||'')===node.id).sort(sorter());
-  const q=(searchEl?.value||'').trim().toLowerCase();
+  const q=(searchEl.value||'').trim().toLowerCase();
   items.filter(m=>(m.name||'').toLowerCase().includes(q)).forEach(m=>list.appendChild(renderItem(m)));
   node.children.forEach(ch=>appendFolderSection(ch,false,list));
-  content.appendChild(list);
-  section.appendChild(content);
-  
-  header.onclick=()=>{
-    state.collapse[node.id]=!state.collapse[node.id];
-    save();
-    if(state.collapse[node.id]) content.classList.remove('open'); 
-    else content.classList.add('open');
-    header.classList.toggle('collapsed',state.collapse[node.id]);
-  };
-  
+  content.appendChild(list);section.appendChild(content);
+  header.onclick=()=>{state.collapse[node.id]=!state.collapse[node.id];save();if(state.collapse[node.id]) content.classList.remove('open'); else content.classList.add('open');header.classList.toggle('collapsed',state.collapse[node.id]);};
   header.addEventListener('dragover',e=>{e.preventDefault();header.classList.add('drop-target');});
   header.addEventListener('dragleave',()=>header.classList.remove('drop-target'));
-  header.addEventListener('drop',e=>{
-    e.preventDefault();
-    header.classList.remove('drop-target');
-    const id=e.dataTransfer.getData('text/id');
-    if(!id)return;
-    const m=state.media[id];
-    if(!m)return;
-    m.folderId=node.id;
-    save();
-    renderFolders();
-    renderMain();
-  });
-  
+  header.addEventListener('drop',e=>{e.preventDefault();header.classList.remove('drop-target');const id=e.dataTransfer.getData('text/id');if(!id)return;const m=state.media[id];if(!m)return;m.folderId=node.id;save();renderFolders();renderMain();});
   host.appendChild(section);
 }
-
 function sorter(){return (a,b)=>state.sort==='newest'?(b.createdAt||0)-(a.createdAt||0):(a.createdAt||0)-(b.createdAt||0)}
 
-async function renderMain(){
-  if (!mainList || !mainEmpty) return;
-  const all=Object.values(state.media||{});
-  const q=(searchEl?.value||'').trim().toLowerCase();
-  const filtered=all.filter(m=>(m.name||'').toLowerCase().includes(q));
-  mainList.innerHTML='';
-  if(!filtered.length){
-    mainEmpty.style.display='flex';
-    mainList.style.display='none';
-    return;
-  }
-  mainEmpty.style.display='none';
-  mainList.style.display='block';
-  for(const m of filtered.sort(sorter())){
-    mainList.appendChild(await renderItem(m));
-  }
+async function renderMain(){const all=Object.values(state.media||{});const q=(searchEl.value||'').trim().toLowerCase();const filtered=all.filter(m=>(m.name||'').toLowerCase().includes(q));mainList.innerHTML='';if(!filtered.length){mainEmpty.style.display='flex';mainList.style.display='none';return;}mainEmpty.style.display='none';mainList.style.display='block';
+  for(const m of filtered.sort(sorter())){mainList.appendChild(await renderItem(m));}
 }
 
-async function renderItem(m){
-  const el=document.createElement('div');
-  el.className='vitem';
-  el.draggable=true;
-  const th=document.createElement('div');
-  th.className='thumb';
-  
-  const blob=await dbGet(m.dbKey); 
-  if(!blob){
-    const p=document.createElement('div');
-    p.textContent='(missing)';
-    th.appendChild(p);
-  } else {
-    const url=URL.createObjectURL(blob); 
-    if(m.type==='photo'){
-      const i=new Image();
-      i.src=url;
-      th.appendChild(i);
-    } else {
-      const v=document.createElement('video');
-      v.src=url;
-      v.muted=true;
-      v.playsInline=true;
-      th.appendChild(v);
-    } 
-  }
-  
-  const meta=document.createElement('div');
-  meta.className='meta';
-  const h=document.createElement('h4');
-  h.textContent=m.name||'(untitled)';
-  const badge=document.createElement('span');
-  badge.className='badge';
-  badge.textContent=(m.type||'').toUpperCase();
-  h.appendChild(badge);
-  meta.appendChild(h);
-  
-  const actions=document.createElement('div');
-  actions.className='item-actions';
-  const delBtn=document.createElement('button');
-  delBtn.className='item-btn';
-  delBtn.textContent='🗑️';
-  delBtn.title='Delete';
-  delBtn.onclick=e=>{
-    e.stopPropagation();
-    askDeleteMedia(m.id,m.name||'(untitled)');
-  };
-  actions.appendChild(delBtn);
-  
-  el.append(th,meta,actions); 
-  el.onclick=()=>openViewer(m);
+async function renderItem(m){const el=document.createElement('div');el.className='vitem';el.draggable=true;const th=document.createElement('div');th.className='thumb';
+  const blob=await dbGet(m.dbKey); if(!blob){const p=document.createElement('div');p.textContent='(missing)';th.appendChild(p);} else {const url=URL.createObjectURL(blob); if(m.type==='photo'){const i=new Image();i.src=url;th.appendChild(i);} else {const v=document.createElement('video');v.src=url;v.muted=true;v.playsInline=true;th.appendChild(v);} }
+  const meta=document.createElement('div');meta.className='meta';const h=document.createElement('h4');h.textContent=m.name||'(untitled)';const badge=document.createElement('span');badge.className='badge';badge.textContent=(m.type||'').toUpperCase();h.appendChild(badge);meta.appendChild(h);
+  const actions=document.createElement('div');actions.className='item-actions';const delBtn=document.createElement('button');delBtn.className='item-btn';delBtn.textContent='🗑️';delBtn.title='Delete';delBtn.onclick=e=>{e.stopPropagation();askDeleteMedia(m.id,m.name||'(untitled)');};actions.appendChild(delBtn);
+  el.append(th,meta,actions); el.onclick=()=>openViewer(m);
   el.addEventListener('dragstart',e=>e.dataTransfer.setData('text/id',m.id));
-  
   return el;
 }
 
 // ===== Viewer & Controls
-let uiHideTimer=null;
-function scheduleHideUI(){
-  clearTimeout(uiHideTimer);
-  viewer.classList.remove('hide-ui');
-  uiHideTimer=setTimeout(()=>viewer.classList.add('hide-ui'),3000);
-} 
+let uiHideTimer=null;function scheduleHideUI(){clearTimeout(uiHideTimer);viewer.classList.remove('hide-ui');uiHideTimer=setTimeout(()=>viewer.classList.add('hide-ui'),3000);} 
+async function openViewer(m){ if(m.type!=='video'){ const blob=await dbGet(m.dbKey); if(!blob) return; const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=m.name||'image'; a.click(); return; }
+  viewerFilename.textContent='🎞️ '+(m.name||''); const blob=await dbGet(m.dbKey); if(!blob) return; const url=URL.createObjectURL(blob); viewerVideo.src=url; viewerVideo.muted=false; viewer.classList.add('show'); viewer.setAttribute('aria-hidden','false'); viewerVideo.play().catch(()=>{}); scheduleHideUI(); updateTime(); updateBuffer(); }
+viewer.addEventListener('mousemove',scheduleHideUI);
+viewerClose.onclick=()=>{viewer.classList.remove('show');viewer.setAttribute('aria-hidden','true');viewerVideo.pause();};
 
-async function openViewer(m){ 
-  if(m.type!=='video'){ 
-    const blob=await dbGet(m.dbKey); 
-    if(!blob) return; 
-    const a=document.createElement('a'); 
-    a.href=URL.createObjectURL(blob); 
-    a.download=m.name||'image'; 
-    a.click(); 
-    return; 
-  }
-  viewerFilename.textContent='🎞️ '+(m.name||''); 
-  const blob=await dbGet(m.dbKey); 
-  if(!blob) return; 
-  const url=URL.createObjectURL(blob); 
-  viewerVideo.src=url; 
-  viewerVideo.muted=false; 
-  viewer.classList.add('show'); 
-  viewer.setAttribute('aria-hidden','false'); 
-  viewerVideo.play().catch(()=>{}); 
-  scheduleHideUI(); 
-  updateTime(); 
-  updateBuffer(); 
-}
+ytPlay.onclick=()=>{if(viewerVideo.paused){viewerVideo.play();}else{viewerVideo.pause();}};
+ytRew.onclick=()=>{viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-10)};
+ytFwd.onclick=()=>{viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+10)};
+viewerVideo.addEventListener('play',()=>ytPlay.textContent='⏸');
+viewerVideo.addEventListener('pause',()=>ytPlay.textContent='▶️');
 
-if (viewer) {
-  viewer.addEventListener('mousemove',scheduleHideUI);
-}
+function fmt(t){t=Math.max(0,Math.floor(t||0));const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')}
+function updateTime(){ytTime.textContent=`${fmt(viewerVideo.currentTime)} / ${fmt(viewerVideo.duration||0)}`;const pct=((viewerVideo.currentTime||0)/(viewerVideo.duration||1))*100;ytPlayed.style.width=pct+'%';}
+function updateBuffer(){try{const b=viewerVideo.buffered; if(b && b.length){const end=b.end(b.length-1); const pct=(end/(viewerVideo.duration||1))*100; ytBuffered.style.width=pct+'%';}}catch{}
+requestAnimationFrame(function raf(){if(!viewer.classList.contains('show'))return;updateTime();updateBuffer();requestAnimationFrame(raf)});
 
-if (viewerClose) {
-  viewerClose.onclick=()=>{
-    viewer.classList.remove('show');
-    viewer.setAttribute('aria-hidden','true');
-    viewerVideo.pause();
-  };
-}
-
-if (ytPlay) {
-  ytPlay.onclick=()=>{
-    if(viewerVideo.paused){
-      viewerVideo.play();
-    }else{
-      viewerVideo.pause();
-    }
-  };
-}
-
-if (ytRew) {
-  ytRew.onclick=()=>{
-    viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-10);
-  };
-}
-
-if (ytFwd) {
-  ytFwd.onclick=()=>{
-    viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+10);
-  };
-}
-
-if (viewerVideo) {
-  viewerVideo.addEventListener('play',()=>{
-    if (ytPlay) ytPlay.textContent='⏸';
-  });
-  viewerVideo.addEventListener('pause',()=>{
-    if (ytPlay) ytPlay.textContent='▶️';
-  });
-}
-
-function fmt(t){
-  t=Math.max(0,Math.floor(t||0));
-  const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
-  return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');
-}
-
-function updateTime(){
-  if (!ytTime || !viewerVideo) return;
-  ytTime.textContent=`${fmt(viewerVideo.currentTime)} / ${fmt(viewerVideo.duration||0)}`;
-  const pct=((viewerVideo.currentTime||0)/(viewerVideo.duration||1))*100;
-  if (ytPlayed) ytPlayed.style.width=pct+'%';
-}
-
-function updateBuffer(){
-  try{
-    const b=viewerVideo.buffered; 
-    if(b && b.length){
-      const end=b.end(b.length-1); 
-      const pct=(end/(viewerVideo.duration||1))*100; 
-      if (ytBuffered) ytBuffered.style.width=pct+'%';
-    }
-  } catch(e) {}
-  
-  if(viewer.classList.contains('show')){
-    requestAnimationFrame(()=>{
-      updateTime();
-      updateBuffer();
-    });
-  }
-}
-
-let seeking=false;
-function seekAt(clientX){
-  const rect=ytProgress.getBoundingClientRect();
-  const x=Math.min(Math.max(0,clientX-rect.left),rect.width);
-  const pct=x/rect.width;
-  viewerVideo.currentTime=pct*(viewerVideo.duration||0);
-} 
-
-if (ytProgress) {
-  ytProgress.addEventListener('mousedown',e=>{
-    seeking=true;
-    seekAt(e.clientX);
-  });
-}
-
-window.addEventListener('mousemove',e=>{
-  if(seeking) seekAt(e.clientX);
-});
-
+let seeking=false;function seekAt(clientX){const rect=ytProgress.getBoundingClientRect();const x=Math.min(Math.max(0,clientX-rect.left),rect.width);const pct=x/rect.width;viewerVideo.currentTime=pct*(viewerVideo.duration||0);} 
+ytProgress.addEventListener('mousedown',e=>{seeking=true;seekAt(e.clientX)});
+window.addEventListener('mousemove',e=>{if(seeking) seekAt(e.clientX)});
 window.addEventListener('mouseup',()=>seeking=false);
 
-if (ytVolume) {
-  ytVolume.oninput=()=>{
-    viewerVideo.volume=parseFloat(ytVolume.value);
-    viewerVideo.muted=viewerVideo.volume===0;
-  };
-}
+ytVolume.oninput=()=>{viewerVideo.volume=parseFloat(ytVolume.value);viewerVideo.muted=viewerVideo.volume===0};
+ytMute.onclick=()=>{viewerVideo.muted=!viewerVideo.muted; ytMute.textContent=viewerVideo.muted?'🔇':'🔈';}
 
-if (ytMute) {
-  ytMute.onclick=()=>{
-    viewerVideo.muted=!viewerVideo.muted; 
-    ytMute.textContent=viewerVideo.muted?'🔇':'🔈';
-  };
-}
+ytSpeed.onchange=()=>{viewerVideo.playbackRate=parseFloat(ytSpeed.value)};
 
-if (ytSpeed) {
-  ytSpeed.onchange=()=>{
-    viewerVideo.playbackRate=parseFloat(ytSpeed.value);
-  };
-}
+ytFS.onclick=()=>{const el=viewer;if(!document.fullscreenElement){el.requestFullscreen?.();}else{document.exitFullscreen?.();}};
 
-if (ytFS) {
-  ytFS.onclick=()=>{
-    const el=viewer;
-    if(!document.fullscreenElement){
-      el.requestFullscreen?.();
-    }else{
-      document.exitFullscreen?.();
-    }
-  };
-}
-
-window.addEventListener('keydown',e=>{
-  if(!viewer.classList.contains('show')) return; 
-  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return; 
-  const k=e.key.toLowerCase(); 
-  if(k===' '){
-    e.preventDefault();
-    if (ytPlay) ytPlay.click();
-  } else if(k==='arrowleft'){
-    viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-5);
-  } else if(k==='arrowright'){
-    viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+5);
-  } else if(k==='f'){
-    if (ytFS) ytFS.click();
-  } else if(k==='m'){
-    if (ytMute) ytMute.click();
-  } else if(k==='arrowup'){
-    viewerVideo.volume=Math.min(1,viewerVideo.volume+0.05); 
-    if (ytVolume) ytVolume.value=viewerVideo.volume;
-  } else if(k==='arrowdown'){
-    viewerVideo.volume=Math.max(0,viewerVideo.volume-0.05); 
-    if (ytVolume) ytVolume.value=viewerVideo.volume;
-  }
-});
+window.addEventListener('keydown',e=>{if(!viewer.classList.contains('show')) return; if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return; const k=e.key.toLowerCase(); if(k===' '){e.preventDefault();ytPlay.click();} else if(k==='arrowleft'){viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-5);} else if(k==='arrowright'){viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+5);} else if(k==='f'){ytFS.click();} else if(k==='m'){ytMute.click();} else if(k==='arrowup'){viewerVideo.volume=Math.min(1,viewerVideo.volume+0.05); ytVolume.value=viewerVideo.volume;} else if(k==='arrowdown'){viewerVideo.volume=Math.max(0,viewerVideo.volume-0.05); ytVolume.value=viewerVideo.volume;}});
 
 // ===== Folder CRUD & Modals
-function addFolder(name,parentId=''){
-  const f={id:uid('fld'),name:name.trim(),parentId:parentId||''};
-  state.folders.push(f);
-  state.collapse[f.id]=true;
-  save();
-  renderFolders();
-}
+function addFolder(name,parentId=''){const f={id:uid('fld'),name:name.trim(),parentId:parentId||''};state.folders.push(f);state.collapse[f.id]=true;save();renderFolders();}
+function deleteFolder(id){state.folders.filter(f=>f.parentId===id).forEach(ch=>deleteFolder(ch.id));Object.values(state.media).forEach(m=>{if(m.folderId===id) delete state.media[m.id];});state.folders=state.folders.filter(f=>f.id!==id);}
+function openRename(title,value,okCb){modalTitle.textContent=title;modalInput.value=value;modalCb=okCb;modalOverlay.classList.add('show');modalInput.focus();}
+function openConfirm(text,okCb){modalTitle.textContent='⚠️ Confirm';modalBody.textContent=text;modalCb=okCb;modalOverlay.classList.add('show');}
+modalOK.onclick=()=>{if(modalCb) modalCb(modalInput.value);modalOverlay.classList.remove('show');};
+modalCancel.onclick=()=>{modalOverlay.classList.remove('show');};
+modalInput.addEventListener('keydown',e=>{if(e.key==='Enter') modalOK.click();});
 
-function deleteFolder(id){
-  state.folders.filter(f=>f.parentId===id).forEach(ch=>deleteFolder(ch.id));
-  Object.values(state.media).forEach(m=>{
-    if(m.folderId===id) delete state.media[m.id];
-  });
-  state.folders=state.folders.filter(f=>f.id!==id);
-  delete state.collapse[id];
-}
+// ===== Media Delete
+function askDeleteMedia(id,name){mediaDelTargetId=id;mediaDelText.textContent=`⚠️ Delete "${name}"?`;mediaDelOverlay.classList.add('show');}
+mediaDelOK.onclick=async()=>{if(!mediaDelTargetId) return; const m=state.media[mediaDelTargetId]; if(m) await dbDel(m.dbKey); delete state.media[mediaDelTargetId]; save(); renderFolders(); renderMain(); mediaDelOverlay.classList.remove('show');};
+mediaDelCancel.onclick=()=>{mediaDelOverlay.classList.remove('show');};
 
-function openRename(title,initial,cb){
-  modalTitle.textContent=title;
-  document.getElementById('modalBody').innerHTML='<input id="modalInput" class="input" placeholder="Enter new name" />';
-  setTimeout(()=>{
-    const input = document.getElementById('modalInput');
-    if (input) {
-      input.value=initial||'';
-      input.focus();
-    }
-  },10);
-  modalCb=cb;
-  modalOverlay.classList.add('show');
-}
+// ===== File Uploads
+function setupFileUpload(inputEl,btnEl,type){btnEl.onclick=()=>inputEl.click();inputEl.onchange=async e=>{const files=Array.from(e.target.files);for(const f of files){const id=uid(type);const dbKey=uid('db');const m={id:id,name:f.name,type:type,createdAt:Date.now(),dbKey:dbKey};state.media[id]=m;await dbPut(dbKey,f);}save();renderFolders();renderMain();inputEl.value='';};}
+setupFileUpload(videoInput,addVideos,'video');
+setupFileUpload(photoInput,addPhotos,'photo');
 
-function openConfirm(msg,cb){
-  modalTitle.textContent='Confirm';
-  document.getElementById('modalBody').innerHTML='<div class="small">'+msg+'</div>';
-  modalCb=cb;
-  modalOverlay.classList.add('show');
-}
-
-if (modalOK) {
-  modalOK.onclick=()=>{
-    if(!modalCb){
-      modalOverlay.classList.remove('show');
-      return;
-    }
-    const input = document.getElementById('modalInput');
-    const val=input?input.value:undefined;
-    modalCb(val);
-    modalOverlay.classList.remove('show');
-  };
-}
-
-if (modalCancel) {
-  modalCancel.onclick=()=>{
-    modalOverlay.classList.remove('show');
-    modalCb=null;
-  };
-}
-
-if (modalOverlay) {
-  modalOverlay.addEventListener('click',e=>{
-    if(e.target===modalOverlay) {
-      if (modalCancel) modalCancel.click();
-    }
-  });
-}
-
-function askDeleteMedia(id,name){
-  mediaDelTargetId=id;
-  mediaDelText.textContent='⚠️ Delete "'+(name||'(untitled)')+'"?';
-  mediaDelOverlay.classList.add('show');
-}
-
-if (mediaDelCancel) {
-  mediaDelCancel.onclick=()=>{
-    mediaDelTargetId=null;
-    mediaDelOverlay.classList.remove('show');
-  };
-}
-
-if (mediaDelOverlay) {
-  mediaDelOverlay.addEventListener('click',e=>{
-    if(e.target===mediaDelOverlay) {
-      if (mediaDelCancel) mediaDelCancel.click();
-    }
-  });
-}
-
-if (mediaDelOK) {
-  mediaDelOK.onclick=async()=>{
-    if(mediaDelTargetId && state.media[mediaDelTargetId]){
-      await dbDel(state.media[mediaDelTargetId].dbKey);
-      delete state.media[mediaDelTargetId];
-      save();
-      renderFolders();
-      renderMain();
-    } 
-    mediaDelTargetId=null;
-    mediaDelOverlay.classList.remove('show');
-  };
-}
-
-// ===== Upload handlers
-if (addFolderBtn) {
-  addFolderBtn.onclick=()=>{
-    const n=(newFolderName.value||'').trim();
-    if(!n) return;
-    addFolder(n);
-    newFolderName.value='';
-  };
-}
-
-if (addVideos) {
-  addVideos.onclick=()=>{
-    if (videoInput) videoInput.click();
-  };
-}
-
-if (addPhotos) {
-  addPhotos.onclick=()=>{
-    if (photoInput) photoInput.click();
-  };
-}
-
-if (videoInput) {
-  videoInput.addEventListener('change',e=>handleUpload(e.target.files,'video'));
-}
-
-if (photoInput) {
-  photoInput.addEventListener('change',e=>handleUpload(e.target.files,'photo'));
-}
-
-async function handleUpload(files,type){
-  const arr=[...files||[]];
-  for(const file of arr){
-    const id=uid(type==='video'?'vid':'img');
-    await dbPut(id,file);
-    state.media[id]={id,name:file.name,type,dbKey:id,createdAt:Date.now(),folderId:''};
-  }
-  save();
-  renderFolders();
-  renderMain();
-}
+// ===== Twitter / X Downloader
+fetchTweet.onclick=async()=>{const url=tweetUrl.value.trim();if(!url) return;tweetPreview.style.display='none';saveFromTweet.style.display='none';tweetMediaBox.innerHTML='<div class="small">⏳ Fetching...</div>';tweetPreview.style.display='block';try{const res=await fetch(`https://fixupx.com/api/tweet?url=${encodeURIComponent(url)}`);const data=await res.json();if(!data.success||!data.media||!data.media.length){tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch tweet</div>';return;}const media=data.media[0];const mres=await fetch(media.url);const blob=await mres.blob();tweetFetched={type:media.type==='photo'?'photo':'video',name:`tweet_${Date.now()}.${media.type==='photo'?'jpg':'mp4'}`,blob:blob};const url2=URL.createObjectURL(blob);tweetMediaBox.innerHTML=media.type==='photo'?`<img src="${url2}" style="max-width:100%;border-radius:8px">`:`<video src="${url2}" controls style="max-width:100%;border-radius:8px"></video>`;saveFromTweet.style.display='block';}catch{console.error('Twitter fetch failed');tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch tweet</div>';}};
+saveFromTweet.onclick=async()=>{if(!tweetFetched.blob) return;const id=uid(tweetFetched.type);const dbKey=uid('db');const m={id:id,name:tweetFetched.name,type:tweetFetched.type,createdAt:Date.now(),dbKey:dbKey};state.media[id]=m;await dbPut(dbKey,tweetFetched.blob);save();renderFolders();renderMain();tweetPreview.style.display='none';tweetUrl.value='';};
 
 // ===== Search & Sort
-if (searchEl) {
-  searchEl.oninput=()=>{
-    renderFolders();
-    renderMain();
-  };
+searchEl.oninput=()=>{renderFolders();renderMain();};
+sortBtn.onclick=()=>{state.sort=state.sort==='newest'?'oldest':'newest';sortBtn.textContent='📅 Sort: '+(state.sort==='newest'?'Newest':'Oldest');renderFolders();renderMain();};
+
+// ===== Init
+function initApp(){renderFolders();renderMain();}
+document.addEventListener('DOMContentLoaded',initApp);
 }
-
-if (sortBtn) {
-  sortBtn.onclick=()=>{
-    state.sort=state.sort==='newest'?'oldest':'newest';
-    sortBtn.textContent=state.sort==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';
-    save();
-    renderFolders();
-    renderMain();
-  };
-}
-
-// ===== Twitter (FixTweet)
-if (fetchTweet) {
-  fetchTweet.onclick=async()=>{
-    const url=(tweetUrl.value||'').trim();
-    if(!url) return;
-    const idMatch=url.match(/status\/(\d+)/);
-    if(!idMatch){
-      alert('Invalid Twitter/X URL');
-      return;
-    }
-    const tweetId=idMatch[1];
-    tweetPreview.style.display='block';
-    saveFromTweet.style.display='none';
-    tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';
-    
-    try{
-      const res=await fetch(`https://fixupx.com/api/tweet/${tweetId}`);
-      const data=await res.json();
-      const v=data?.media?.videos?.[0]?.url;
-      const img=data?.media?.photos?.[0];
-      tweetMediaBox.innerHTML='';
-      tweetFetched={type:null,name:null,blob:null};
-      
-      if(v){
-        const vr=document.createElement('video');
-        vr.src=v;
-        vr.controls=true;
-        vr.autoplay=true;
-        vr.muted=true;
-        vr.style.maxWidth='100%';
-        vr.style.borderRadius='10px';
-        tweetMediaBox.appendChild(vr);
-        tweetFetched.type='video';
-        tweetFetched.name=`tweet_${tweetId}.mp4`;
-        tweetFetched.blob=await (await fetch(v)).blob();
-      } else if(img){
-        const ir=new Image();
-        ir.src=img;
-        ir.style.maxWidth='100%';
-        ir.style.borderRadius='10px';
-        tweetMediaBox.appendChild(ir);
-        tweetFetched.type='photo';
-        tweetFetched.name=`tweet_${tweetId}.jpg`;
-        tweetFetched.blob=await (await fetch(img)).blob();
-      } else {
-        tweetMediaBox.innerHTML='<div class="small">⚠️ No media found in this tweet.</div>';
-      }
-      
-      if(tweetFetched.blob){
-        saveFromTweet.style.display='inline-block';
-      }
-    } catch(e){
-      tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch media.</div>';
-    }
-  };
-}
-
-if (saveFromTweet) {
-  saveFromTweet.onclick=async()=>{
-    if(!tweetFetched.blob) return;
-    const id=uid(tweetFetched.type==='video'?'vid':'img');
-    await dbPut(id,tweetFetched.blob);
-    state.media[id]={id,name:tweetFetched.name,type:tweetFetched.type,dbKey:id,createdAt:Date.now(),folderId:''};
-    save();
-    renderFolders();
-    renderMain();
-    tweetPreview.style.display='none';
-    tweetMediaBox.innerHTML='';
-    tweetUrl.value='';
-    tweetFetched={type:null,name:null,blob:null};
-    saveFromTweet.style.display='none';
-  };
-}
-
-// ===== Boot
-function init(){
-  initDOMRefs();
-  renderFolders();
-  renderMain();
-}
-
-// Wait for DOM to be fully loaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
-
-// ===== Self-tests (console)
-(function selfTests(){
-  try {
-    const requiredIds = ['foldersContainer','videoInput','photoInput','mainList','viewer','viewerVideo','ytProgress','ytPlayed','ytBuffered'];
-    const missing = requiredIds.filter(id=>!document.getElementById(id));
-    console.group('%cMediaTracker Self-Test','color:#7c3aed;font-weight:bold');
-    console.log('Document readyState:', document.readyState);
-    console.log('Missing essential elements:', missing);
-    console.assert(missing.length===0, 'Some essential DOM nodes are missing');
-    console.assert(typeof window.requestAnimationFrame==='function','rAF is available');
-    console.assert(typeof Promise==='function','Promise is available');
-    // HTML closing tag presence test
-    const htmlStr = document.documentElement.outerHTML || '';
-    console.assert(htmlStr.includes('</body>') && htmlStr.includes('</html>'), 'HTML closing tags present');
-    console.log('✅ Basic boot OK');
-    console.groupEnd();
-  } catch (e) {
-    console.error('Self-test failed:', e);
-  }
-})();
-
-// ===== Extra IndexedDB round-trip test
-(async function idbRoundTripTest(){
-  try{
-    const tid = 'test_'+Math.random().toString(36).slice(2,8);
-    const blob = new Blob([new Uint8Array([1,2,3,4])], {type:'application/octet-stream'});
-    await dbPut(tid, blob);
-    const got = await dbGet(tid);
-    console.assert(got && got.size===4, 'IndexedDB blob round-trip size should be 4');
-    await dbDel(tid);
-    console.log('✅ IndexedDB round-trip OK');
-  }catch(e){ console.warn('IndexedDB round-trip failed', e); }
-})();
-
-} // end guard
 </script>
-<!-- EOF sentinel to discourage truncation by document.write() environments -->
 </body>
 </html>
