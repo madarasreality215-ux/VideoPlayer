@@ -77,14 +77,23 @@
 }
 
 /* Awaken overlay */
-#awakenOverlay{
-  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+#awakenOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(10,9,8,0.92);
-  z-index: 100000;
+  z-index: 999999 !important; /* ensure overlay above all */
   cursor: pointer;
-  opacity: 1; transition: opacity 900ms ease;
+  opacity: 1;
+  pointer-events: all !important;
+  transition: opacity 900ms ease;
 }
-#awakenOverlay.hidden{ opacity:0; pointer-events:none; }
+#awakenOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 #awakenOverlay .awaken-text{
   font-family: "Cinzel", Georgia, serif;
   font-size: 28px;

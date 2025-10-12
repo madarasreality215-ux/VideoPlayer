@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📱 MediaTracker Pro</title>
+  <style>:root{--bg:#0b1220;--card:#0f1724;--card2:#141b2b;--txt:#e6eef9;--muted:rgba(230,238,249,.65);--acc:#7c3aed;--accH:#6d28d9;--thin:rgba(255,255,255,.15);--secBG:rgba(255,255,255,.03);--secBD:rgba(255,255,255,.08)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica Neue,Arial}</style>
+</head>
+<body>
+  <!-- Background Music -->
+  <audio id="bgMusic" src="audio/beneath_the_mask_instrumental.mp3" loop></audio>
+
+  <header><h1 class="title">📱 MediaTracker Pro</h1></header>
+  <main><p>Media library loaded successfully.</p></main>
+
+  <script>
+    // === Background Music Fade System ===
+    const bgMusic = document.getElementById('bgMusic');
+    let fadeInterval;
+    bgMusic.volume = 0;
+
+    function fadeAudio(targetVolume, duration = 1500) {
+      clearInterval(fadeInterval);
+      const steps = 30;
+      const stepTime = duration / steps;
+      const startVol = bgMusic.volume;
+      const diff = targetVolume - startVol;
+      let i = 0;
+      fadeInterval = setInterval(() => {
+        i++;
+        bgMusic.volume = startVol + (diff * (i / steps));
+        if (i >= steps) {
+          bgMusic.volume = targetVolume;
+          clearInterval(fadeInterval);
+          if (targetVolume === 0) bgMusic.pause();
+        }
+      }, stepTime);
+    }
+
+    // Play music after first user interaction (browser restriction)
+    window.addEventListener('click', async () => {
+      if (bgMusic.paused) {
+        try {
+          await bgMusic.play();
+          fadeAudio(0.75, 2000);
+        } catch (e) { console.warn('Audio start blocked:', e); }
+      }
+    }, { once: true });
+
+    // === Video Pause/Resume Logic ===
+    function pauseMusic() { fadeAudio(0, 800); }
+    function resumeMusic() { if (!bgMusic.paused) fadeAudio(0.75, 1500); else { bgMusic.play(); fadeAudio(0.75, 1500); } }
+
+    // Integrate with existing viewer logic
+    const oldOpenViewer = window.openViewer;
+    window.openViewer = function(id) {
+      pauseMusic();
+      if (oldOpenViewer) oldOpenViewer(id);
+    };
+
+    const oldCloseViewer = window.closeViewer;
+    window.closeViewer = function() {
+      if (oldCloseViewer) oldCloseViewer();
+      resumeMusic();
+    };
+  </script>
+</body>
+</html>
