@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📊 Stats Dashboard | MediaTracker Pro</title>
+
+  <!-- Fonts & Libraries -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #0f1724;
+      --ink: #e6eef9;
+      --muted: rgba(230,238,249,.7);
+      --stroke: rgba(255,255,255,.08);
+      --accent: #7c3aed;
+      --accent2: #9f7aea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Header */
+    header {
+      background: var(--card);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--stroke);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: box-shadow .2s ease, transform .1s ease;
+    }
+    .btn:hover {
+      box-shadow: 0 0 12px rgba(124,58,237,.6);
+    }
+    .btn:active { transform: scale(.98); }
+
+    /* Content wrapper */
+    .wrapper {
+      padding: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Profile section */
+    .profile-section {
+      position: relative;
+      text-align: center;
+      margin-bottom: 24px;
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .banner {
+      width: 100%;
+      height: 220px;
+      background: #1a2233 center/cover no-repeat;
+      cursor: pointer;
+    }
+    .avatar-wrap {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: -60px auto 0;
+      border-radius: 50%;
+      border: 4px solid var(--bg);
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+      cursor: pointer;
+      background: #121826;
+    }
+    .avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .display-name {
+      margin: 10px 0 6px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 16px;
+    }
+    .actions {
+      margin: 10px 0 18px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h3 {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .card p.n {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 6px 0 0;
+    }
+
+    /* Chart container */
+    #chartWrap {
+      margin: 28px auto 10px;
+      max-width: 520px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    /* Hidden inputs */
+    input[type="file"] { display: none; }
+
+    /* Toasts */
+    .toast {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      background: #111827;
+      color: #e6eef9;
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: toast-in .25s ease forwards;
+    }
+    @keyframes toast-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 Stats Dashboard</h1>
+    <button class="btn" onclick="window.location.href='index.html'">🏠 Back to Library</button>
+  </header>
+
+  <div class="wrapper">
+    <!-- Profile Section -->
+    <section class="profile-section">
+      <div id="banner" class="banner" title="Click to change banner"></div>
+
+      <div id="avatarWrap" class="avatar-wrap" title="Click to change profile picture">
+        <img id="avatar" class="avatar" alt="Profile Picture" />
+      </div>
+
+      <h2 id="displayName" class="display-name">Loading…</h2>
+      <p class="subtitle">Your profile is editable only by you.</p>
+
+      <div class="actions">
+        <button id="addProfileBtn" class="btn" style="display:none">➕ Add Profile</button>
+      </div>
+
+      <input id="bannerInput" type="file" accept="image/*" />
+      <input id="avatarInput" type="file" accept="image/*" />
+    </section>
+
+    <!-- Stats Cards -->
+    <section class="stats-grid">
+      <div class="card">
+        <h3>🎥 Total Videos</h3>
+        <p id="videoCount" class="n">0</p>
+      </div>
+      <div class="card">
+        <h3>🖼️ Total Images</h3>
+        <p id="photoCount" class="n">0</p>
+      </div>
+      <div class="card">
+        <h3>⏱️ Total Watch Time</h3>
+        <p id="watchTime" class="n">—</p>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section id="chartWrap" class="card">
+      <h3 style="margin-bottom:8px;">Media Mix</h3>
+      <canvas id="mediaChart"></canvas>
+    </section>
+  </div>
+
+  <script>
+    // ===== Firebase Init (same project) =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+      authDomain: "personalplayer-c8d3b.firebaseapp.com",
+      projectId: "personalplayer-c8d3b",
+      storageBucket: "personalplayer-c8d3b.appspot.com",
+      messagingSenderId: "396785312809",
+      appId: "1:396785312809:web:02290950ec22a13165a838"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // ===== Elements =====
+    const banner = document.getElementById("banner");
+    const avatar = document.getElementById("avatar");
+    const avatarWrap = document.getElementById("avatarWrap");
+    const displayNameEl = document.getElementById("displayName");
+    const bannerInput = document.getElementById("bannerInput");
+    const avatarInput = document.getElementById("avatarInput");
+    const addProfileBtn = document.getElementById("addProfileBtn");
+
+    const videoCount = document.getElementById("videoCount");
+    const photoCount = document.getElementById("photoCount");
+    const watchTime = document.getElementById("watchTime");
+
+    let chart;
+
+    // ===== Toast helper =====
+    function toast(msg) {
+      const t = document.createElement("div");
+      t.className = "toast";
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = "0";
+        t.style.transform = "translateY(6px)";
+        setTimeout(() => t.remove(), 250);
+      }, 2200);
+    }
+
+    // ===== Auth & Page Guard =====
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        // If not signed in, send to main login
+        window.location.href = "index.html";
+        return;
+      }
+
+      displayNameEl.textContent = user.displayName || "Unnamed User";
+      const uid = user.uid;
+      const profileRef = db.collection("userProfile").doc(uid);
+
+      // Listen for profile doc to show/hide +Add Profile and populate banner/avatar
+      profileRef.onSnapshot((doc) => {
+        const exists = doc.exists;
+        addProfileBtn.style.display = exists ? "none" : "inline-block";
+        if (exists) {
+          const d = doc.data() || {};
+          if (d.bannerUrl) banner.style.backgroundImage = `url(${d.bannerUrl})`;
+          if (d.avatarUrl) avatar.src = d.avatarUrl;
+        } else {
+          // Default visuals if no profile
+          banner.style.backgroundImage = "";
+          avatar.src = "";
+        }
+      });
+
+      // Create profile doc (no edit mode; simple initial creation)
+      addProfileBtn.onclick = async () => {
+        try {
+          await profileRef.set(
+            { createdAt: firebase.firestore.FieldValue.serverTimestamp() },
+            { merge: true }
+          );
+          toast("✅ Profile created");
+        } catch (e) {
+          toast("⚠️ Failed to create profile");
+          console.error(e);
+        }
+      };
+
+      // Upload banner (editable only by you, the signed-in user)
+      banner.onclick = () => bannerInput.click();
+      bannerInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const ref = storage.ref(`profile/banner_${uid}.jpg`);
+          await ref.put(file);
+          const url = await ref.getDownloadURL();
+          banner.style.backgroundImage = `url(${url})`;
+          await profileRef.set({ bannerUrl: url, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          toast("✅ Banner updated");
+        } catch (err) {
+          toast("⚠️ Banner upload failed");
+          console.error(err);
+        } finally {
+          bannerInput.value = "";
+        }
+      };
+
+      // Upload avatar (editable only by you)
+      avatarWrap.onclick = () => avatarInput.click();
+      avatarInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const ref = storage.ref(`profile/avatar_${uid}.jpg`);
+          await ref.put(file);
+          const url = await ref.getDownloadURL();
+          avatar.src = url;
+          await profileRef.set({ avatarUrl: url, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          toast("✅ Profile picture updated");
+        } catch (err) {
+          toast("⚠️ Avatar upload failed");
+          console.error(err);
+        } finally {
+          avatarInput.value = "";
+        }
+      };
+
+      // ===== Realtime Stats from Firestore =====
+      db.collection("videos").onSnapshot((snapshot) => {
+        let videos = 0;
+        let photos = 0;
+        let totalDuration = 0;
+
+        snapshot.forEach((doc) => {
+          const d = doc.data();
+          if (d.type === "video") {
+            videos++;
+            if (typeof d.duration === "number") totalDuration += d.duration;
+          } else if (d.type === "photo") {
+            photos++;
+          }
+        });
+
+        videoCount.textContent = String(videos);
+        photoCount.textContent = String(photos);
+        watchTime.textContent = totalDuration > 0 ? `${(totalDuration / 60).toFixed(1)} min` : "—";
+        updateChart([videos, photos]);
+      });
+    });
+
+    // ===== Chart.js Doughnut (auto-updating) =====
+    function updateChart(data) {
+      const ctx = document.getElementById("mediaChart").getContext("2d");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: ["Videos", "Images"],
+          datasets: [
+            {
+              data,
+              backgroundColor: ["#7c3aed", "#9f7aea"],
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          plugins: {
+            legend: {
+              labels: { color: "#e6eef9" }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
