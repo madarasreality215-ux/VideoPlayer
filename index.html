@@ -50,6 +50,7 @@ input::placeholder{color:rgba(230,238,249,.6)}
 .meta p{margin:4px 0 0;font-size:12px;color:var(--muted)}
 .upload-progress{height:5px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:6px}
 .upload-progress .bar{width:0%;height:100%;background:var(--acc);transition:width .2s ease}
+.fade-out{opacity:0;transition:opacity .5s ease}
 /* Viewer */
 .viewer-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:1000}
 .viewer-full.show{display:block;opacity:1;pointer-events:auto}
@@ -57,8 +58,10 @@ input::placeholder{color:rgba(230,238,249,.6)}
 .viewer-video{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 0 60px rgba(0,0,0,.6)}
 .viewer-toolbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;padding:0 16px;background:linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,0));color:#e6eef9;}
 .viewer-title{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Retry */
 .retry-wrap{position:absolute;inset:auto auto 24px 24px;display:none}
 .retry-btn{height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+/* Trash overlay */
 .trashOv{position:absolute;left:16px;right:16px;bottom:24px;padding:14px;background:rgba(239,68,68,.08);border:2px dashed rgba(239,68,68,.6);border-radius:12px;text-align:center;color:#ef4444;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
 .trashOv.active{opacity:1;transform:translateY(-6px);pointer-events:auto}
 .trashOv.drag-over{background:rgba(239,68,68,.14)}
@@ -72,11 +75,11 @@ input::placeholder{color:rgba(230,238,249,.6)}
 
 <div class="container">
   <aside class="sidebar" style="position:relative">
-    <div class="section"><div class="status"><span class="dot"></span><span>Local mode: IndexedDB + LocalStorage</span></div></div>
+    <div class="section"><div class="status"><span class="dot"></span><span>Local mode: IndexedDB + LocalStorage (no cloud)</span></div></div>
 
     <div class="section">
       <h3>📁 Folder Management</h3>
-      <div class="row"><input id="newFolderName" placeholder="New folder name"></div>
+      <div class="row"><input id="newFolderName" placeholder="New folder name" /></div>
       <button id="addFolderBtn" class="btn" style="width:100%">📁 Add Folder</button>
     </div>
 
@@ -96,7 +99,7 @@ input::placeholder{color:rgba(230,238,249,.6)}
 
     <div class="section">
       <h3>🐦 Twitter/X Downloader</h3>
-      <div class="row"><input id="twUrl" placeholder="Paste Twitter/X URL here"></div>
+      <div class="row"><input id="twUrl" placeholder="Paste Twitter/X URL here" /></div>
       <div class="row"><button id="twFetch" class="btn" style="width:100%">Fetch Twitter Media</button></div>
     </div>
 
@@ -115,7 +118,7 @@ input::placeholder{color:rgba(230,238,249,.6)}
   <main class="main">
     <div class="section">
       <div class="row">
-        <input type="search" id="searchInput" placeholder="🔍 Search media...">
+        <input type="search" id="searchInput" placeholder="🔍 Search media..." />
         <button id="sortBtn" class="btn">📅 Sort: Newest</button>
       </div>
     </div>
@@ -130,14 +133,419 @@ input::placeholder{color:rgba(230,238,249,.6)}
       <button class="viewer-back" id="viewerBack">← Back</button>
       <div class="viewer-title" id="viewerTitle"></div>
     </div>
-    <video id="viewerVideo" class="viewer-video" controls playsinline crossorigin="anonymous"></video>
+    <video id="viewerVideo" class="viewer-video" controls playsinline muted></video>
     <div class="retry-wrap" id="retryWrap"><button class="retry-btn" id="retryBtn">↻ Retry Play</button></div>
   </div>
 </div>
 
 <script>
-// Core logic stays identical to previous build except viewerDownload + close removed
-// ... (keep same JavaScript from previous file but remove any viewerDl and closePopup references)
+/* ====== Persistence (IndexedDB for blobs, LocalStorage for metadata) ====== */
+const DB_NAME = 'mtp_db';
+const DB_STORE = 'files';
+let dbPromise = null;
+function openDB(){
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ const db=req.result; if(!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return dbPromise;
+}
+async function idbPut(key, blob){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx=db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).put(blob, key);
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx=db.transaction(DB_STORE,'readonly');
+    const req=tx.objectStore(DB_STORE).get(key);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbDel(key){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx=db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).delete(key);
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+
+/* ====== State ====== */
+let currentFolderId = "";
+let sortOrder = "newest";
+const foldersMap = new Map();
+const mediaMap   = new Map(); // id -> {id,name,type,folderId,createdAt,size, url?}
+const expandedSet = new Set();
+const LS_KEYS = { folders: "mtp_folders", media: "mtp_media", expanded: "mtp_expanded" };
+const objectUrlCache = new Map(); // id -> objectURL
+
+/* ====== DOM refs ====== */
+const foldersEl     = document.getElementById('folders');
+const noFolders     = document.getElementById('noFolders');
+const videoListEl   = document.getElementById('videoList');
+const viewerEl      = document.getElementById('viewer');
+const viewerVid     = document.getElementById('viewerVideo');
+const viewerTitleEl = document.getElementById('viewerTitle');
+const retryWrap     = document.getElementById('retryWrap');
+const retryBtn      = document.getElementById('retryBtn');
+
+/* ====== Utils ====== */
+const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const genId = (p="id") => p+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+function saveState(){
+  localStorage.setItem(LS_KEYS.folders, JSON.stringify([...foldersMap.values()]));
+  const meta = [...mediaMap.values()].map(({id,name,type,folderId,createdAt,size})=>({id,name,type,folderId,createdAt,size}));
+  localStorage.setItem(LS_KEYS.media, JSON.stringify(meta));
+  localStorage.setItem(LS_KEYS.expanded, JSON.stringify([...expandedSet]));
+}
+function loadState(){
+  try{
+    const f=JSON.parse(localStorage.getItem(LS_KEYS.folders)||"[]");
+    const m=JSON.parse(localStorage.getItem(LS_KEYS.media)||"[]");
+    const ex=JSON.parse(localStorage.getItem(LS_KEYS.expanded)||"[]");
+    f.forEach(x=>foldersMap.set(x.id,x));
+    m.forEach(x=>mediaMap.set(x.id,x));
+    ex.forEach(id=>expandedSet.add(id));
+  }catch(e){}
+}
+
+/* ====== Boot ====== */
+(function init(){
+  loadState();
+  wireUI();
+  renderFolders();
+  renderVideos();
+})();
+
+/* ====== UI Wiring ====== */
+function wireUI(){
+  document.getElementById('addFolderBtn').onclick = onAddFolder;
+  document.getElementById('addVideoBtn').onclick  = ()=> pickFiles('video');
+  document.getElementById('addPhotoBtn').onclick  = ()=> pickFiles('image');
+  document.getElementById('sortBtn').onclick = ()=>{
+    sortOrder = sortOrder==='newest'?'oldest':'newest';
+    document.getElementById('sortBtn').textContent = sortOrder==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';
+    renderVideos();
+  };
+  document.getElementById('searchInput').oninput = renderVideos;
+
+  document.getElementById('twFetch').onclick = fetchTweet;
+  document.getElementById('tweetDownloadBtn').onclick = downloadPreviewToLocal;
+
+  document.getElementById('viewerBack').onclick = closeViewer;
+  retryBtn.onclick = retryPlay;
+
+  // Keep controls active when interacting
+  ['mousemove','mousedown','keypress','touchstart'].forEach(evt=>{
+    viewerEl.addEventListener(evt, ()=>{ if(viewerEl.classList.contains('show')) resetViewerIdle(); }, {passive:true});
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(!viewerEl.classList.contains('show')) return;
+    if(e.key===' '){ e.preventDefault(); if(viewerVid.paused) viewerVid.play(); else viewerVid.pause(); }
+    else if(e.key==='ArrowLeft'){ viewerVid.currentTime = Math.max(0, viewerVid.currentTime - 5); }
+    else if(e.key==='ArrowRight'){ viewerVid.currentTime = Math.min(viewerVid.duration||Infinity, viewerVid.currentTime + 5); }
+    else if(e.key==='Escape'){ closeViewer(); }
+  });
+}
+
+/* ====== Folders ====== */
+function onAddFolder(){
+  const nf=document.getElementById('newFolderName');
+  const name=(nf.value||'').trim();
+  if(!name) return;
+  const id=genId('fld');
+  foldersMap.set(id,{id,name,parentId:currentFolderId||"",createdAt:Date.now()});
+  nf.value='';
+  renderFolders(); saveState();
+}
+function renderFolders(){
+  const roots=[]; foldersMap.forEach(v=>{ if(!v.parentId) roots.push(v) });
+  noFolders.style.display = roots.length ? 'none' : 'block';
+  const out=[];
+  function rowHtml(n,depth){ const expanded=expandedSet.has(n.id);
+    return `<div class="frow ${expanded?'expanded':'collapsed'}" data-fid="${n.id}" style="padding-left:${8+depth*14}px">
+              <span class="fchev">▶</span>
+              <span class="fname">📁 ${esc(n.name)}</span>
+              <div class="fctrl">
+                <button data-act="add">➕</button>
+                <button data-act="ren">✏️</button>
+                <button data-act="del">🗑️</button>
+              </div>
+            </div>
+            <div class="children ${expanded?'show':''}" data-ch-of="${n.id}" style="max-height:${expanded?9999:0}px">${childHtml(n.id,depth+1)}</div>`;
+  }
+  function childHtml(pid,depth){ let s=''; foldersMap.forEach(ch=>{ if(ch.parentId===pid){ s+=rowHtml(ch,depth) }}); return s; }
+  roots.forEach(r=>out.push(rowHtml(r,0)));
+  foldersEl.innerHTML = out.join('');
+  foldersEl.querySelectorAll('.frow').forEach(el=>{
+    const id = el.getAttribute('data-fid');
+    el.onclick = e=>{ if(e.target.closest('.fctrl')) return; toggleFolder(id) };
+    el.querySelectorAll('.fctrl button').forEach(b=>{
+      b.onclick = ev=>{
+        ev.stopPropagation();
+        const act=b.getAttribute('data-act');
+        if(act==='add') inlineAddSub(id,el);
+        if(act==='ren') inlineRename(id,el);
+        if(act==='del') confirmDeleteFolder(id);
+      };
+    });
+    el.ondragover = ev=>{ ev.preventDefault(); el.style.outline = `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--acc')}` };
+    el.ondragleave = ()=>{ el.style.outline='none' };
+    el.ondrop = e=>{ e.preventDefault(); el.style.outline='none'; const mid=e.dataTransfer.getData('media-id'); if(mid) moveMediaToFolder(mid,id); };
+  });
+}
+function toggleFolder(id){ if(expandedSet.has(id)) expandedSet.delete(id); else expandedSet.add(id); renderFolders(); renderVideos(); saveState(); }
+function inlineAddSub(parentId,rowEl){
+  const inp=document.createElement('input'); inp.placeholder='New subfolder name'; inp.style.marginTop='6px';
+  const wrap=document.createElement('div'); wrap.style.paddingLeft='28px'; wrap.appendChild(inp);
+  rowEl.insertAdjacentElement('afterend',wrap); inp.focus();
+  const save=()=>{ const name=(inp.value||'').trim(); wrap.remove(); if(!name) return; const id=genId('fld'); foldersMap.set(id,{id,name,parentId,createdAt:Date.now()}); renderFolders(); saveState(); };
+  inp.onkeydown=e=>{ if(e.key==='Enter') save(); if(e.key==='Escape') wrap.remove() };
+  inp.onblur=save;
+}
+function inlineRename(id,rowEl){
+  const f=foldersMap.get(id); if(!f) return;
+  const nameEl=rowEl.querySelector('.fname'); const cur=f.name;
+  const inp=document.createElement('input'); inp.value=cur; inp.style.maxWidth='70%';
+  nameEl.replaceWith(inp); inp.focus();
+  const save=(commit)=>{ const nv=(inp.value||'').trim(); const span=document.createElement('span'); span.className='fname'; span.textContent='📁 '+(commit&&nv?nv:cur); inp.replaceWith(span); if(commit && nv && nv!==cur){ foldersMap.set(id,{...f,name:nv}); renderFolders(); saveState(); } };
+  inp.onkeydown=e=>{ if(e.key==='Enter') save(true); if(e.key==='Escape') save(false) };
+  inp.onblur=()=>save(true);
+}
+function confirmDeleteFolder(id){
+  if(!confirm('⚠️ Delete this folder and all its contents? This cannot be undone.')) return;
+  deleteFolderRecursive(id); renderFolders(); renderVideos(); saveState();
+}
+function deleteFolderRecursive(id){
+  const toDel=[id]; foldersMap.forEach(f=>{ if(f.parentId===id) toDel.push(f.id)});
+  for(const fid of toDel){ deleteFolderMedia(fid); foldersMap.delete(fid);}
+}
+async function deleteFolderMedia(fid){
+  const ids=[]; [...mediaMap.values()].forEach(m=>{ if((m.folderId||'')===fid) ids.push(m.id); });
+  for(const id of ids){ await deleteMedia(id); }
+}
+
+/* ====== Media: Add / Progress / Save ====== */
+function pickFiles(type){
+  const input=document.createElement('input');
+  input.type='file'; input.multiple=true;
+  input.accept = type==='video'?'video/*':'image/*';
+  input.onchange=e=> handleFiles(Array.from(e.target.files||[]), type);
+  input.click();
+}
+async function handleFiles(files,type){
+  for(const file of files){ await addLocalWithProgress(file,type); }
+}
+
+/** Simulated upload with file-size scaled duration (2–10s), then save blob in IDB */
+async function addLocalWithProgress(file,type){
+  const id = genId('med');
+  const size = file.size || 0;
+  // Create immediate temp preview
+  const tempUrl = URL.createObjectURL(file);
+  mediaMap.set(id,{ id, name:file.name, type, folderId:currentFolderId||"", createdAt:Date.now(), size, url:tempUrl });
+  renderVideos(); saveState();
+
+  // 0–200MB -> 2–10s (clamped)
+  const MB = size / (1024*1024);
+  const dur = Math.round(2000 + Math.min(8000, (MB/200)*8000));
+  await simulateProgress(id, dur);
+
+  try{
+    await idbPut('media:'+id, file);
+    const prog = document.querySelector(`[data-mid='${id}'] .upload-progress`);
+    if(prog){ prog.classList.add('fade-out'); setTimeout(()=>prog.remove(),600); }
+  }catch(err){
+    console.error('Saving to IndexedDB failed', err);
+    alert('Saving this file locally failed. Check console for details.');
+  }
+}
+
+function simulateProgress(id, durationMs){
+  return new Promise(resolve=>{
+    const start = performance.now();
+    function step(now){
+      const t = Math.min(1, (now - start)/durationMs);
+      setProgress(id, Math.round(t*100));
+      if(t < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+function setProgress(id,pct){
+  const bar=document.querySelector(`[data-mid='${id}'] .upload-progress .bar`);
+  if(bar){ bar.style.width = pct+'%'; }
+}
+
+/* ====== Rendering ====== */
+function renderVideos(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+  let items=[...mediaMap.values()];
+  if(currentFolderId) items = items.filter(m=>(m.folderId||'')===currentFolderId);
+  if(q) items = items.filter(m=>(m.name||'').toLowerCase().includes(q));
+  items.sort((a,b)=> sortOrder==='newest' ? (b.createdAt-a.createdAt) : (a.createdAt-b.createdAt));
+
+  if(!items.length){
+    videoListEl.innerHTML = currentFolderId?`<div class="empty">No media in "${esc(foldersMap.get(currentFolderId)?.name||'Selected Folder')}" yet.</div>`:'<div class="empty">No media yet. Add some!</div>';
+    return;
+  }
+  videoListEl.innerHTML = items.map(m=>{
+    const progressHTML=`<div class="upload-progress"><div class="bar" style="width:0%"></div></div>`;
+    const provisionalSrc = m.url || '';
+    const thumb = m.type==='image'
+      ? `<img data-src-id="${m.id}" ${provisionalSrc?`src="${provisionalSrc}"`:''} alt="${esc(m.name)}">`
+      : `<video data-src-id="${m.id}" ${provisionalSrc?`src="${provisionalSrc}"`:''} autoplay muted playsinline loop></video>`;
+    return `<div class="vitem" data-mid="${m.id}" draggable="true">
+              <div class="thumb">${thumb}</div>
+              <div class="meta">
+                <h4>${m.type==='image'?'🖼️':'🎞️'} ${esc(m.name)}</h4>
+                <p>${(m.type||'').toUpperCase()} • ${new Date(m.createdAt).toLocaleString()}</p>
+                ${progressHTML}
+              </div>
+            </div>`;
+  }).join('');
+
+  // Wire items
+  videoListEl.querySelectorAll('.vitem').forEach(el=>{
+    const id=el.getAttribute('data-mid');
+    el.onclick=()=>openViewer(id);
+    el.ondragstart=e=>{ e.dataTransfer.setData('media-id',id); showTrash(true) };
+    el.ondragend=()=>showTrash(false);
+  });
+
+  // Attach object URLs where missing (after reload)
+  videoListEl.querySelectorAll('[data-src-id]').forEach(async node=>{
+    if(node.getAttribute('src')) return;
+    const id = node.getAttribute('data-src-id');
+    const m = mediaMap.get(id);
+    if(!m) return;
+    const url = await ensureObjectUrl(m);
+    if(url){ node.setAttribute('src', url); }
+  });
+}
+
+/* ====== Viewer ====== */
+let viewerIdleTimer=null;
+async function openViewer(id){
+  const m=mediaMap.get(id); if(!m) return;
+  hideRetry();
+  viewerVid.loop=true; viewerVid.muted=true; viewerVid.controls=true; viewerVid.playsinline=true;
+  const url = await ensureObjectUrl(m);
+  viewerVid.src = url || '';
+  viewerTitleEl.textContent = m.name || 'Media';
+  viewerEl.classList.add('show');
+  resetViewerIdle(); viewerVid.focus();
+
+  const playAttempt = viewerVid.play();
+  if(playAttempt && typeof playAttempt.then==='function'){
+    playAttempt.catch(()=>{ showRetry(); });
+  }
+  setTimeout(()=>{ if(viewerVid.currentTime===0) showRetry(); }, 2000);
+}
+function closeViewer(){
+  try{ viewerVid.pause(); viewerVid.removeAttribute('src'); viewerVid.load(); }catch(_){}
+  viewerEl.classList.remove('show');
+  clearTimeout(viewerIdleTimer);
+  document.body.classList.remove('viewer-idle');
+  hideRetry();
+}
+function resetViewerIdle(){ clearTimeout(viewerIdleTimer); document.body.classList.remove('viewer-idle'); viewerIdleTimer=setTimeout(()=>{ document.body.classList.add('viewer-idle'); }, 3000); }
+function showRetry(){ retryWrap.style.display='block'; }
+function hideRetry(){ retryWrap.style.display='none'; }
+function retryPlay(){ const curSrc = viewerVid.currentSrc || viewerVid.getAttribute('src'); viewerVid.pause(); viewerVid.removeAttribute('src'); viewerVid.load(); requestAnimationFrame(()=>{ viewerVid.src = curSrc; viewerVid.play().catch(()=>{}); }); }
+
+/* ====== Object URL helpers ====== */
+async function ensureObjectUrl(m){
+  if (objectUrlCache.has(m.id)) return objectUrlCache.get(m.id);
+  if (m.url && m.url.startsWith('blob:')){ objectUrlCache.set(m.id, m.url); return m.url; }
+  const blob = await idbGet('media:'+m.id);
+  if(!blob) return '';
+  const url = URL.createObjectURL(blob);
+  objectUrlCache.set(m.id, url);
+  return url;
+}
+async function deleteMedia(id){
+  const url = objectUrlCache.get(id);
+  if(url){ URL.revokeObjectURL(url); objectUrlCache.delete(id); }
+  mediaMap.delete(id);
+  try{ await idbDel('media:'+id); }catch(e){}
+}
+
+/* ====== Drag & Trash ====== */
+const trash=document.getElementById('trashBinOverlay');
+function moveMediaToFolder(mid,fid){ const m=mediaMap.get(mid); if(!m) return; mediaMap.set(mid,{...m,folderId:fid}); renderVideos(); saveState(); }
+function showTrash(b){ trash.classList.toggle('active', !!b); }
+trash.ondragover = e=>{ e.preventDefault(); trash.classList.add('drag-over') };
+trash.ondragleave = ()=> trash.classList.remove('drag-over');
+trash.ondrop = async e=>{
+  e.preventDefault(); trash.classList.remove('drag-over');
+  const mid=e.dataTransfer.getData('media-id'); const m=mediaMap.get(mid); if(!m) return;
+  const ok=confirm('⚠️ Delete this media? This cannot be undone.');
+  if(!ok) return;
+  document.querySelector(`[data-mid='${mid}']`)?.remove();
+  await deleteMedia(mid);
+  renderVideos(); saveState();
+};
+
+/* ====== FixTweet (VX/FX) -> Local Save with Progress ====== */
+let currentPreviewUrl = null;
+async function fxGet(tw){
+  const clean = tw.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i,'');
+  const ep1=`https://api.fxtwitter.com/${clean}`, ep2=`https://api.vxtwitter.com/${clean}`;
+  let r=await fetch(ep1); if(!r.ok) r=await fetch(ep2);
+  const j=await r.json(); if(!j?.tweet) throw new Error('No tweet');
+  return j;
+}
+async function fetchTweet(){
+  const url=(document.getElementById('twUrl').value||'').trim();
+  if(!url) return;
+  try{
+    const data=await fxGet(url);
+    const medias=(data.tweet.media?.videos||data.tweet.media?.all||[]);
+    if(!medias?.length) throw new Error('No media');
+    let best=null;
+    const variants=medias[0].variants||[];
+    for(const v of variants){ if(/mp4/.test(v.content_type||'')){ if(!best || (+v.bitrate>(+best.bitrate||0))) best=v; } }
+    const src = best?.url || medias[0].url || medias[0].download_url;
+    if(!src) throw new Error('No video URL');
+    currentPreviewUrl = src;
+    const v=document.getElementById('tweetPreviewVideo');
+    v.src=src; v.muted=true; v.autoplay=true; v.playsinline=true; v.loop=true; v.load();
+    document.getElementById('tweetPreviewSection').style.display='block';
+  }catch(e){
+    console.error(e); alert('Failed to fetch tweet media.');
+  }
+}
+async function downloadPreviewToLocal(){
+  if(!currentPreviewUrl) return;
+  try{
+    const res = await fetch(currentPreviewUrl, {mode:'cors'});
+    if(!res.ok) throw new Error('fetch fail');
+    const blob = await res.blob();
+    const type = /image\//.test(blob.type) ? 'image' : 'video';
+    const file = new File([blob], `media_${Date.now()}.${type==='image'?'jpg':'mp4'}`, {type: blob.type || (type==='image'?'image/jpeg':'video/mp4')});
+    await addLocalWithProgress(file, type);
+    const preview=document.getElementById('tweetPreviewSection');
+    preview.style.display='none';
+    document.getElementById('twUrl').value='';
+    const v=document.getElementById('tweetPreviewVideo');
+    v.pause?.(); v.removeAttribute('src'); v.load();
+  }catch(e){
+    console.error(e); alert('Download failed.');
+  }
+}
 </script>
 </body>
 </html>
