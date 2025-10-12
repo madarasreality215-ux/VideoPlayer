@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>📱 MediaTracker Pro — Drive Player</title>
+<meta name="theme-color" content="#7c3aed">
+<link rel="preconnect" href="https://fixupx.com">
+<style>
+  :root{--bg:#0b1220;--card:#0f1724;--text:#e6eef9;--muted:rgba(230,238,249,0.65);--accent:#7c3aed;--accent-hover:#6d28d9;--green:#10b981;--red:#b91c1c;--card-border:rgba(255,255,255,0.08);--card-shadow:0 10px 25px rgba(0,0,0,0.28);--radius:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  a{color:inherit;text-decoration:none}
+  header{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--card);padding:12px 16px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--card-border)}
+  h1{margin:0;font-size:18px;font-weight:700}
+  .ghost{background:transparent;border:1px solid var(--card-border);padding:10px 12px;border-radius:10px;cursor:pointer;color:#fff;transition:.25s}
+  .ghost:hover{background:rgba(255,255,255,0.08)}
+  .container{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  @media(max-width:1024px){.container{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:14px}
+  .card h3{margin:0 0 10px 0;font-size:14px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .sidebar{display:flex;flex-direction:column;gap:16px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;transition:.25s}
+  .btn:hover{background:var(--accent-hover)}
+  .btn-green{background:var(--green)}
+  .btn-row{display:flex;gap:8px}
+  .input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:transparent;color:var(--text)}
+  .small{font-size:12px;color:var(--muted)}
+  /* Folder sections */
+  .folders-empty{color:var(--muted);text-align:center;padding:10px}
+  .folder-section{border:1px dashed var(--card-border);border-radius:12px;background:rgba(255,255,255,0.02);margin-top:8px}
+  .folder-header{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 12px;cursor:pointer;border-radius:12px}
+  .folder-left{display:flex;align-items:center;gap:8px;min-width:0}
+  .chev{transition:transform .2s}
+  .folder-header.collapsed .chev{transform:rotate(-90deg)}
+  .folder-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder-actions{display:flex;gap:6px}
+  .action{background:transparent;border:1px solid var(--card-border);color:inherit;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .action:hover{background:rgba(255,255,255,0.06)}
+  .folder-content{overflow:hidden;max-height:0;transition:max-height .25s ease,padding .25s ease;padding:0 12px}
+  .folder-content.open{padding:8px 12px 12px 44px}
+  .vlist{display:flex;flex-direction:column;gap:8px}
+  .vitem{position:relative;display:flex;gap:10px;align-items:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px;cursor:pointer;transition:.2s}
+  .vitem:hover{background:rgba(255,255,255,0.06)}
+  .thumb{width:120px;height:72px;background:#000;border-radius:8px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#aaa}
+  .thumb video,.thumb img{width:100%;height:100%;object-fit:cover}
+  .meta{min-width:0;flex:1}
+  .meta h4{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{font-size:10px;background:var(--accent);color:#fff;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .item-actions{position:absolute;top:6px;right:6px;display:flex;gap:6px;opacity:0;transition:.2s}
+  .vitem:hover .item-actions{opacity:1}
+  .item-btn{border:1px solid var(--card-border);background:rgba(0,0,0,0.35);color:#fff;border-radius:8px;padding:4px 6px;font-size:12px;cursor:pointer}
+  .item-btn:hover{background:rgba(0,0,0,0.55)}
+  /* Main */
+  .main{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:12px}
+  .topbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  .search{flex:1;position:relative}
+  .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--card-border);background:transparent;color:var(--text)}
+  .sort{border:1px solid var(--card-border);border-radius:10px;padding:10px 12px;cursor:pointer}
+  .empty{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:16px}
+  #mainList{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-start;align-items:flex-start}
+  .vitem{width:260px;flex-direction:column;text-align:center}
+  .vitem .thumb{width:100%;height:150px}
+  /* Drive-style Viewer */
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9999;opacity:0;transition:opacity .25s ease}
+  .viewer.show{display:flex;opacity:1}
+  .viewer-inner{position:relative;max-width:92vw;max-height:92vh;width:92vw;height:auto;display:flex;flex-direction:column;gap:10px;align-items:center}
+  .viewer video{max-width:92vw;max-height:78vh;border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,0.45);background:#000}
+  .viewer-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;width:92vw;max-width:92vw;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,0.55);color:#fff;backdrop-filter:blur(12px)}
+  .viewer-topbar .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%}
+
+  /* YouTube-style control bar */
+  .yt-controls{width:92vw;max-width:92vw;display:flex;flex-direction:column;gap:8px;color:#fff}
+  .yt-progress{position:relative;height:6px;background:rgba(255,255,255,0.18);border-radius:999px;cursor:pointer;overflow:hidden}
+  .yt-buffered{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,0.35)}
+  .yt-played{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent)}
+  .yt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(0,0,0,0.55);backdrop-filter:blur(12px);border:1px solid var(--card-border);border-radius:12px;padding:6px 10px}
+  .ctrl{border:1px solid var(--card-border);background:rgba(255,255,255,0.08);color:#fff;border-radius:10px;padding:6px 10px;font-size:14px;cursor:pointer}
+  .ctrl:hover{background:rgba(255,255,255,0.14)}
+  .time{font-variant-numeric:tabular-nums;color:#e5e7eb;min-width:110px;text-align:center}
+  #ytVolume{width:120px}
+  #ytSpeed{appearance:none;background:rgba(30,30,30,0.8);border:1px solid var(--card-border);color:#fff;border-radius:8px;padding:6px 28px 6px 10px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,#fff 50%),linear-gradient(135deg,#fff 50%,transparent 50%);background-position:calc(100% - 15px) calc(1em + 2px),calc(100% - 10px) calc(1em + 2px);background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+  #ytSpeed:hover{background:rgba(50,50,50,0.9)}
+  /* Auto-hide controls */
+  .viewer.hide-ui .viewer-topbar,.viewer.hide-ui .yt-controls{opacity:0;pointer-events:none;transition:opacity .25s}
+  .viewer .viewer-topbar,.viewer .yt-controls{transition:opacity .25s}
+  /* Sort & Sign Out restyle */
+  #sortBtn,header .ghost{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:10px 14px;font-weight:600;transition:all .25s ease}
+  #sortBtn{color:var(--muted)}
+  #sortBtn:hover,header .ghost:hover{background:rgba(255,255,255,0.08)}
+</style>
+</head>
+<body>
+  <header>
+    <h1>📱 MediaTracker Pro (Drive Player)</h1>
+    <a class="ghost" href="login.html">🚪 Sign Out</a>
+  </header>
+
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- 📦 Create Folder -->
+      <div class="card">
+        <h3>📦 Create Folder</h3>
+        <div class="row">
+          <input id="newFolderName" class="input" placeholder="New folder name">
+          <button id="addFolder" class="btn">📁 Folders</button>
+        </div>
+      </div>
+
+      <!-- 🏠 Main Library -->
+      <div class="card">
+        <h3>🏠 Main Library</h3>
+        <div id="foldersEmpty" class="folders-empty" style="display:none">No folders yet. Create one below!</div>
+        <div id="foldersContainer"></div>
+      </div>
+
+      <!-- ➕ Add Media -->
+      <div class="card">
+        <h3>➕ Add Media</h3>
+        <div class="btn-row">
+          <input id="videoInput" type="file" accept="video/*" multiple style="display:none">
+          <button id="addVideos" class="btn" style="flex:1">🎥 Add Videos</button>
+          <input id="photoInput" type="file" accept="image/*" multiple style="display:none">
+          <button id="addPhotos" class="btn btn-green" style="flex:1">📷 Add Photos</button>
+        </div>
+        <div class="small" style="margin-top:6px;text-align:center">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+      </div>
+
+      <!-- 🐦 Twitter / X Downloader (FixTweet) -->
+      <div class="card">
+        <h3>🐦 Twitter/X Downloader</h3>
+        <input id="tweetUrl" class="input" placeholder="Paste Twitter/X URL here">
+        <button id="fetchTweet" class="btn" style="width:100%;margin-top:8px">Fetch Twitter Media</button>
+        <div id="tweetPreview" class="card" style="margin-top:10px;display:none;padding:10px">
+          <h3 style="margin-bottom:8px">🎞️ Preview</h3>
+          <div id="tweetMediaBox" style="text-align:center"></div>
+          <button id="saveFromTweet" class="btn" style="width:100%;margin-top:10px;display:none">⬇️ Download to Library</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="topbar">
+        <div class="search"><input id="search" placeholder="🔍 Search videos..."></div>
+        <button id="sortBtn" class="ghost">📅 Sort: Newest</button>
+      </div>
+      <div id="mainEmpty" class="empty">No media yet. Add some videos or photos to get started!</div>
+      <div id="mainList" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Drive-style Fullscreen viewer -->
+  <div id="viewer" class="viewer">
+    <div class="viewer-inner">
+      <div class="viewer-topbar">
+        <span id="viewerFilename" class="title">🎞️ </span>
+        <button id="viewerClose" class="ghost">❌</button>
+      </div>
+      <video id="viewerVideo" playsinline></video>
+      <div class="yt-controls">
+        <div id="ytProgress" class="yt-progress">
+          <div id="ytBuffered" class="yt-buffered"></div>
+          <div id="ytPlayed" class="yt-played"></div>
+        </div>
+        <div class="yt-row">
+          <div style="display:flex;align-items:center;gap:8px">
+            <button id="ytPlay" class="ctrl">⏯️</button>
+            <button id="ytRew" class="ctrl">⏪ 10s</button>
+            <button id="ytFwd" class="ctrl">⏩ 10s</button>
+          </div>
+          <div class="time" id="ytTime">00:00 / 00:00</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button id="ytMute" class="ctrl">🔈</button>
+            <input id="ytVolume" type="range" min="0" max="1" step="0.05" value="0.5">
+            <select id="ytSpeed">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+            <button id="ytFS" class="ctrl">⤢</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal (rename / confirm) -->
+  <div id="modalOverlay" class="viewer" style="background:rgba(0,0,0,.78);">
+    <div class="card" style="max-width:440px;width:92%">
+      <h3 id="modalTitle">Rename Folder</h3>
+      <div id="modalBody">
+        <input id="modalInput" class="input" placeholder="Enter new name">
+      </div>
+      <div class="row right" style="margin-top:12px">
+        <button id="modalCancel" class="ghost">Cancel</button>
+        <button id="modalOK" class="btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Media Delete mini modal -->
+  <div id="mediaDelOverlay" class="overlay">
+    <div class="mini-modal">
+      <div class="small" id="mediaDelText" style="margin-bottom:10px">⚠️ Delete this media?</div>
+      <div class="row right">
+        <button id="mediaDelCancel" class="btn-outline">Cancel</button>
+        <button id="mediaDelOK" class="btn-danger">🗑️ Delete</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ===== State (localStorage + IndexedDB) =====
+const LS_KEY='mtp_meta_v2';
+const DB_NAME='mtp_media_db';
+const DB_STORE='media';
+let state={folders:[],media:{},collapse:{},sort:'newest'};
+const uid=p=>p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+const save=()=>localStorage.setItem(LS_KEY,JSON.stringify(state));
+const load=()=>{try{Object.assign(state,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}};load();
+
+// ===== IndexedDB helpers =====
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=e=>{e.target.result.createObjectStore(DB_STORE)};r.onerror=rej;r.onsuccess=e=>res(e.target.result)});}
+async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(blob,id);return new Promise(r=>tx.oncomplete=r)}
+async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}
+async function dbDel(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(id);return new Promise(r=>tx.oncomplete=r)}
+
+// ===== Helpers =====
+function ensureDefaultCollapse(id){ if(state.collapse[id]===undefined){ state.collapse[id]=true; }}
+function sorter(){return (a,b)=>state.sort==='newest'?(b.createdAt||0)-(a.createdAt||0):(a.createdAt||0)-(b.createdAt||0)}
+function fmt(t){t=Math.max(0,Math.floor(t||0));const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')}
+
+// ===== DOM =====
+const foldersContainer=document.getElementById('foldersContainer');
+const foldersEmpty=document.getElementById('foldersEmpty');
+const newFolderName=document.getElementById('newFolderName');
+const addFolderBtn=document.getElementById('addFolder');
+const videoInput=document.getElementById('videoInput');
+const addVideos=document.getElementById('addVideos');
+const photoInput=document.getElementById('photoInput');
+const addPhotos=document.getElementById('addPhotos');
+const searchEl=document.getElementById('search');
+const mainEmpty=document.getElementById('mainEmpty');
+const mainList=document.getElementById('mainList');
+const sortBtn=document.getElementById('sortBtn');
+// Viewer
+const viewer=document.getElementById('viewer');
+const viewerVideo=document.getElementById('viewerVideo');
+const viewerFilename=document.getElementById('viewerFilename');
+const viewerClose=document.getElementById('viewerClose');
+// YT controls
+const ytProgress=document.getElementById('ytProgress');
+const ytBuffered=document.getElementById('ytBuffered');
+const ytPlayed=document.getElementById('ytPlayed');
+const ytPlay=document.getElementById('ytPlay');
+const ytRew=document.getElementById('ytRew');
+const ytFwd=document.getElementById('ytFwd');
+const ytTime=document.getElementById('ytTime');
+const ytMute=document.getElementById('ytMute');
+const ytVolume=document.getElementById('ytVolume');
+const ytSpeed=document.getElementById('ytSpeed');
+const ytFS=document.getElementById('ytFS');
+// Modal
+const modalOverlay=document.getElementById('modalOverlay');
+const modalTitle=document.getElementById('modalTitle');
+const modalInput=document.getElementById('modalInput');
+const modalOK=document.getElementById('modalOK');
+const modalCancel=document.getElementById('modalCancel');
+let modalCb=null;
+// Delete mini modal
+const mediaDelOverlay=document.getElementById('mediaDelOverlay');
+const mediaDelText=document.getElementById('mediaDelText');
+const mediaDelOK=document.getElementById('mediaDelOK');
+const mediaDelCancel=document.getElementById('mediaDelCancel');
+let mediaDelTargetId=null;
+// Twitter
+const tweetUrl=document.getElementById('tweetUrl');
+const fetchTweet=document.getElementById('fetchTweet');
+const tweetPreview=document.getElementById('tweetPreview');
+const tweetMediaBox=document.getElementById('tweetMediaBox');
+const saveFromTweet=document.getElementById('saveFromTweet');
+let tweetFetched={type:null,name:null,blob:null};
+
+// ===== Rendering (folders + main) =====
+function buildTree(pid=''){return state.folders.filter(f=>(f.parentId||'')===(pid||'')).map(f=>({...f,children:buildTree(f.id)}));}
+function renderFolders(){const tree=buildTree('');foldersContainer.innerHTML='';foldersEmpty.style.display=state.folders.length?'none':'block';tree.forEach(n=>appendFolderSection(n,true,foldersContainer));}
+function appendFolderSection(node,isRoot,host){ensureDefaultCollapse(node.id);const section=document.createElement('div');section.className='folder-section';
+  const header=document.createElement('div');header.className='folder-header'+(state.collapse[node.id]?' collapsed':'');header.dataset.id=node.id;
+  const left=document.createElement('div');left.className='folder-left';const chev=document.createElement('span');chev.className='chev';chev.textContent='▾';const title=document.createElement('span');title.className='folder-title';title.textContent='📁 '+node.name;left.append(chev,title);
+  const actions=document.createElement('div');actions.className='folder-actions';
+  const addSub=document.createElement('button');addSub.className='action';addSub.textContent='➕ Sub';addSub.onclick=e=>{e.stopPropagation();openRename('Create subfolder','',val=>{if(!val.trim())return;const f={id:uid('fld'),name:val.trim(),parentId:node.id};state.folders.push(f);ensureDefaultCollapse(f.id);save();renderFolders();});};
+  const ren=document.createElement('button');ren.className='action';ren.textContent='✏️ Rename';ren.onclick=e=>{e.stopPropagation();openRename('Rename folder',node.name,val=>{const f=state.folders.find(x=>x.id===node.id);if(f){f.name=val.trim();save();renderFolders();}})};
+  const del=document.createElement('button');del.className='action';del.textContent='🗑️ Delete';del.onclick=e=>{e.stopPropagation();openConfirm('Delete this folder and all its contents?',()=>{deleteFolder(node.id);save();renderFolders();renderMain();});};
+  actions.append(addSub,ren,del);
+  header.append(left,actions);section.appendChild(header);
+  const content=document.createElement('div');content.className='folder-content';if(!state.collapse[node.id]) content.classList.add('open');
+  const list=document.createElement('div');list.className='vlist';
+  const items=Object.values(state.media).filter(m=>(m.folderId||'')===node.id).sort(sorter());
+  const q=(searchEl.value||'').trim().toLowerCase();
+  items.filter(m=>(m.name||'').toLowerCase().includes(q)).forEach(m=>list.appendChild(renderItem(m)));
+  node.children.forEach(ch=>appendFolderSection(ch,false,list));
+  content.appendChild(list);section.appendChild(content);
+  header.onclick=()=>{state.collapse[node.id]=!state.collapse[node.id];save();if(state.collapse[node.id]) content.classList.remove('open'); else content.classList.add('open');header.classList.toggle('collapsed',state.collapse[node.id]);};
+  header.addEventListener('dragover',e=>{e.preventDefault();header.classList.add('drop-target');});
+  header.addEventListener('dragleave',()=>header.classList.remove('drop-target'));
+  header.addEventListener('drop',e=>{e.preventDefault();header.classList.remove('drop-target');const id=e.dataTransfer.getData('text/id');if(!id)return;const m=state.media[id];if(!m)return;m.folderId=node.id;save();renderFolders();renderMain();});
+  host.appendChild(section);
+}
+
+async function renderMain(){const all=Object.values(state.media||{});const q=(searchEl.value||'').trim().toLowerCase();const filtered=all.filter(m=>(m.name||'').toLowerCase().includes(q));mainList.innerHTML='';if(!filtered.length){mainEmpty.style.display='flex';mainList.style.display='none';return;}mainEmpty.style.display='none';mainList.style.display='block';
+  for(const m of filtered.sort(sorter())){mainList.appendChild(await renderItem(m));}
+}
+
+async function renderItem(m){const el=document.createElement('div');el.className='vitem';el.draggable=true;const th=document.createElement('div');th.className='thumb';
+  const blob=await dbGet(m.dbKey); if(!blob){const p=document.createElement('div');p.textContent='(missing)';th.appendChild(p);} else {
+    const url=URL.createObjectURL(blob);
+    if(m.type==='photo'){const i=new Image();i.src=url;th.appendChild(i);} else {const v=document.createElement('video');v.src=url;v.muted=true;v.playsInline=true;th.appendChild(v);} }
+  const meta=document.createElement('div');meta.className='meta';const h=document.createElement('h4');h.textContent=m.name||'(untitled)';const badge=document.createElement('span');badge.className='badge';badge.textContent=(m.type||'').toUpperCase();h.appendChild(badge);meta.appendChild(h);
+  const actions=document.createElement('div');actions.className='item-actions';const delBtn=document.createElement('button');delBtn.className='item-btn';delBtn.textContent='🗑️';delBtn.title='Delete';delBtn.onclick=e=>{e.stopPropagation();askDeleteMedia(m.id,m.name||'(untitled)');};actions.appendChild(delBtn);
+  el.append(th,meta,actions); el.onclick=()=>openViewer(m);
+  el.addEventListener('dragstart',e=>e.dataTransfer.setData('text/id',m.id));
+  return el;
+}
+
+// ===== Drive-style Viewer with YT controls =====
+let uiHideTimer=null;function scheduleHideUI(){clearTimeout(uiHideTimer);viewer.classList.remove('hide-ui');uiHideTimer=setTimeout(()=>viewer.classList.add('hide-ui'),3000);} 
+async function openViewer(m){ if(m.type!=='video'){ const blob=await dbGet(m.dbKey); if(!blob) return; const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=m.name||'image'; a.click(); return; }
+  viewerFilename.textContent='🎞️ '+(m.name||''); const blob=await dbGet(m.dbKey); if(!blob) return; const url=URL.createObjectURL(blob); viewerVideo.src=url; viewerVideo.muted=false; viewer.classList.add('show'); viewerVideo.play().catch(()=>{}); scheduleHideUI(); updateTime(); updateBuffer(); }
+viewer.addEventListener('mousemove',scheduleHideUI);
+viewerClose.onclick=()=>{viewer.classList.remove('show');viewerVideo.pause();};
+
+// Play/pause & seek
+ytPlay.onclick=()=>{if(viewerVideo.paused){viewerVideo.play();}else{viewerVideo.pause();}};
+ytRew.onclick=()=>{viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-10)};
+ytFwd.onclick=()=>{viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+10)};
+viewerVideo.addEventListener('play',()=>ytPlay.textContent='⏸');
+viewerVideo.addEventListener('pause',()=>ytPlay.textContent='▶️');
+
+// Time & buffer
+function updateTime(){ytTime.textContent=`${fmt(viewerVideo.currentTime)} / ${fmt(viewerVideo.duration||0)}`;const pct=((viewerVideo.currentTime||0)/(viewerVideo.duration||1))*100;ytPlayed.style.width=pct+'%';}
+function updateBuffer(){try{const b=viewerVideo.buffered; if(b && b.length){const end=b.end(b.length-1); const pct=(end/(viewerVideo.duration||1))*100; ytBuffered.style.width=pct+'%';}}catch{}
+requestAnimationFrame(function raf(){if(!viewer.classList.contains('show'))return;updateTime();updateBuffer();requestAnimationFrame(raf)});
+
+// Progress click/drag seek
+let seeking=false;function seekAt(clientX){const rect=ytProgress.getBoundingClientRect();const x=Math.min(Math.max(0,clientX-rect.left),rect.width);const pct=x/rect.width;viewerVideo.currentTime=pct*(viewerVideo.duration||0);} 
+ytProgress.addEventListener('mousedown',e=>{seeking=true;seekAt(e.clientX)});
+window.addEventListener('mousemove',e=>{if(seeking) seekAt(e.clientX)});
+window.addEventListener('mouseup',()=>seeking=false);
+
+// Volume & mute
+ytVolume.oninput=()=>{viewerVideo.volume=parseFloat(ytVolume.value);viewerVideo.muted=viewerVideo.volume===0};
+ytMute.onclick=()=>{viewerVideo.muted=!viewerVideo.muted; if(viewerVideo.muted){ytMute.textContent='🔇';}else{ytMute.textContent='🔈';}}
+
+// Speed
+ytSpeed.onchange=()=>{viewerVideo.playbackRate=parseFloat(ytSpeed.value)};
+
+// Fullscreen
+ytFS.onclick=()=>{const el=viewer;if(!document.fullscreenElement){el.requestFullscreen?.();}else{document.exitFullscreen?.();}};
+
+// Keyboard shortcuts when viewer open
+window.addEventListener('keydown',e=>{if(!viewer.classList.contains('show')) return; if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return; const k=e.key.toLowerCase(); if(k===' '){e.preventDefault();ytPlay.click();} else if(k==='arrowleft'){viewerVideo.currentTime=Math.max(0,viewerVideo.currentTime-5);} else if(k==='arrowright'){viewerVideo.currentTime=Math.min((viewerVideo.duration||0),viewerVideo.currentTime+5);} else if(k==='f'){ytFS.click();} else if(k==='m'){ytMute.click();} else if(k==='arrowup'){viewerVideo.volume=Math.min(1,viewerVideo.volume+0.05); ytVolume.value=viewerVideo.volume;} else if(k==='arrowdown'){viewerVideo.volume=Math.max(0,viewerVideo.volume-0.05); ytVolume.value=viewerVideo.volume;}});
+
+// ===== Folder CRUD =====
+function addFolder(name,parentId=''){const f={id:uid('fld'),name:name.trim(),parentId:parentId||''};state.folders.push(f);state.collapse[f.id]=true;save();renderFolders();}
+function deleteFolder(id){state.folders.filter(f=>f.parentId===id).forEach(ch=>deleteFolder(ch.id));Object.values(state.media).forEach(m=>{if(m.folderId===id) delete state.media[m.id];});state.folders=state.folders.filter(f=>f.id!==id);delete state.collapse[id];}
+function openRename(title,initial,cb){modalTitle.textContent=title;modalInput.value=initial||'';modalCb=cb;modalOverlay.classList.add('show');setTimeout(()=>modalInput.focus(),50);} 
+function openConfirm(msg,cb){modalTitle.textContent='Confirm';document.getElementById('modalBody').innerHTML='<div class="small">'+msg+'</div>';modalCb=cb;modalOverlay.classList.add('show');}
+modalOK.onclick=()=>{if(modalTitle.textContent==='Confirm'){modalCb&&modalCb();}else{modalCb&&modalCb(modalInput.value);}modalOverlay.classList.remove('show');};
+modalCancel.onclick=()=>modalOverlay.classList.remove('show');
+modalOverlay.addEventListener('click',e=>{if(e.target===modalOverlay) modalOverlay.classList.remove('show');});
+
+// ===== Media delete mini modal =====
+function askDeleteMedia(id,name){mediaDelTargetId=id;mediaDelText.textContent='⚠️ Delete "'+(name||'(untitled)')+'"?';mediaDelOverlay.classList.add('show');}
+mediaDelCancel.onclick=()=>{mediaDelTargetId=null;mediaDelOverlay.classList.remove('show');};
+mediaDelOverlay.addEventListener('click',e=>{if(e.target===mediaDelOverlay){mediaDelTargetId=null;mediaDelOverlay.classList.remove('show');}});
+mediaDelOK.onclick=async()=>{if(mediaDelTargetId && state.media[mediaDelTargetId]){await dbDel(state.media[mediaDelTargetId].dbKey);delete state.media[mediaDelTargetId];save();renderFolders();renderMain();} mediaDelTargetId=null;mediaDelOverlay.classList.remove('show');};
+
+// ===== Upload handlers (→ IndexedDB + meta in LS) =====
+addFolderBtn.onclick=()=>{const n=(newFolderName.value||'').trim();if(!n) return;addFolder(n);newFolderName.value='';};
+addVideos.onclick=()=>videoInput.click(); addPhotos.onclick=()=>photoInput.click();
+videoInput.addEventListener('change',e=>handleUpload(e.target.files,'video'));
+photoInput.addEventListener('change',e=>handleUpload(e.target.files,'photo'));
+async function handleUpload(files,type){const arr=[...files||[]];for(const file of arr){const id=uid(type==='video'?'vid':'img');await dbPut(id,file);state.media[id]={id,name:file.name,type,dbKey:id,createdAt:Date.now(),folderId:''};}save();renderFolders();renderMain();}
+
+// ===== Search & Sort =====
+searchEl.oninput=()=>{renderFolders();renderMain();};
+sortBtn.onclick=()=>{state.sort=state.sort==='newest'?'oldest':'newest';sortBtn.textContent=state.sort==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';save();renderFolders();renderMain();};
+
+// ===== Twitter (FixTweet) — fetch, preview, save to IndexedDB =====
+fetchTweet.onclick=async()=>{const url=(tweetUrl.value||'').trim();if(!url) return;const idMatch=url.match(/status\/(\d+)/);if(!idMatch){alert('Invalid Twitter/X URL');return;}const tweetId=idMatch[1];tweetPreview.style.display='block';saveFromTweet.style.display='none';tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';
+  try{const res=await fetch(`https://fixupx.com/api/tweet/${tweetId}`);const data=await res.json();const v=data?.media?.videos?.[0]?.url;const img=data?.media?.photos?.[0];tweetMediaBox.innerHTML='';tweetFetched={type:null,name:null,blob:null};
+    if(v){const vr=document.createElement('video');vr.src=v;vr.controls=true;vr.autoplay=true;vr.muted=true;vr.style.maxWidth='100%';vr.style.borderRadius='10px';tweetMediaBox.appendChild(vr);tweetFetched.type='video';tweetFetched.name=`tweet_${tweetId}.mp4`;tweetFetched.blob=await (await fetch(v)).blob();}
+    else if(img){const ir=new Image();ir.src=img;ir.style.maxWidth='100%';ir.style.borderRadius='10px';tweetMediaBox.appendChild(ir);tweetFetched.type='photo';tweetFetched.name=`tweet_${tweetId}.jpg`;tweetFetched.blob=await (await fetch(img)).blob();}
+    else{tweetMediaBox.innerHTML='<div class="small">⚠️ No media found in this tweet.</div>'}
+    if(tweetFetched.blob){saveFromTweet.style.display='inline-block';}
+  }catch(e){tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch media.</div>'}
+};
+saveFromTweet.onclick=async()=>{if(!tweetFetched.blob) return;const id=uid(tweetFetched.type==='video'?'vid':'img');await dbPut(id,tweetFetched.blob);state.media[id]={id,name:tweetFetched.name,type:tweetFetched.type,dbKey:id,createdAt:Date.now(),folderId:''};save();renderFolders();renderMain();tweetPreview.style.display='none';tweetMediaBox.innerHTML='';tweetUrl.value='';tweetFetched={type:null,name:null,blob:null};saveFromTweet.style.display='none';};
+
+// ===== Init =====
+(async function init(){renderFolders();await renderMain();})();
+</script>
+</body>
+</html>
