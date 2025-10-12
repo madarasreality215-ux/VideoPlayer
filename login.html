@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Oathbound Archives — Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+/* === Oathbound Gate Login – Final Cinematic Edition === */
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0B1220;
+  font-family: 'Cinzel', serif;
+}
+
+/* Background mural (only this blurred) */
+.background-layer {
+  position: fixed;
+  inset: 0;
+  background: url("https://i.postimg.cc/wjqh586L/The-fool.jpg") center/cover no-repeat;
+  filter: brightness(0.45) contrast(1.05) blur(4px);
+  opacity: 0.45;
+  z-index: -3;
+}
+
+/* Visualizer canvas */
+#visualizer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -2;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+  filter: blur(1.2px);
+}
+
+/* Centered solid stone login box */
+.card-auth {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #2a2a2e;
+  border: 1px solid rgba(200,200,210,0.25);
+  border-radius: 14px;
+  box-shadow: 0 0 20px rgba(255,255,255,0.05), inset 0 0 12px rgba(255,255,255,0.08);
+  padding: 24px 30px;
+  width: 380px;
+  color: #e8e8ea;
+  z-index: 10;
+  opacity: 0;
+  animation: fadeInBox 1s ease forwards;
+}
+
+@keyframes fadeInBox {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Inputs / buttons */
+.card-auth input, .card-auth button {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(200,200,210,0.25);
+  background: #212126;
+  color: #f2f3f7;
+  outline: none;
+  transition: box-shadow 200ms ease, transform 200ms ease, background 200ms ease;
+}
+.card-auth input::placeholder { color: #aeb0b7; }
+.card-auth input:focus, .card-auth button:hover {
+  box-shadow: 0 0 16px rgba(210,210,220,0.35);
+  transform: translateY(-1px);
+}
+.card-auth button {
+  background: #3b3f4d;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Overlay for success */
+#oathAcceptedOverlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+}
+#oathAcceptedOverlay .crest {
+  text-align: center;
+  color: #e8e6ff;
+  font-family: Georgia, serif;
+  letter-spacing: 1px;
+  padding: 28px 36px;
+  border: 2px solid rgba(200,200,210,0.35);
+  border-radius: 16px;
+  box-shadow: 0 0 30px rgba(200,200,210,0.25);
+  background: radial-gradient(ellipse at center, rgba(23,27,40,0.95), rgba(10,12,18,0.95));
+}
+</style>
+</head>
+<body>
+
+<div class="background-layer"></div>
+<canvas id="visualizer"></canvas>
+
+<div class="card-auth">
+  <h1 style="margin:0 0 8px 0;">Oathbound Archives</h1>
+  <p style="margin:0 0 14px 0; opacity:.85;">Enter the Royal Gateway</p>
+  <label for="email">Scroll of Identity</label>
+  <input id="email" type="email" placeholder="Scroll of Identity" autocomplete="username">
+  <label for="password" style="margin-top:10px;">Sigil Key</label>
+  <input id="password" type="password" placeholder="Sigil Key" autocomplete="current-password">
+  <button id="loginBtn" style="margin-top:12px;">Swear Thy Oath</button>
+  <div id="loginMsg" style="margin-top:10px; font-size:0.9rem; opacity:.85;"></div>
+</div>
+
+<div id="oathAcceptedOverlay">
+  <div class="crest">
+    <h2>Oath Bound – Access Granted</h2>
+    <p style="margin:0;opacity:0.9;">Welcome to the Oathbound Archives</p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("visualizer");
+const ctx = canvas.getContext("2d");
+function fitCanvas(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+fitCanvas(); addEventListener("resize", fitCanvas);
+
+const audio = new Audio("golden_brown_vibes.mp3");
+audio.loop = true; audio.volume = 0; let audioCtx, analyser, dataArray, source;
+try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); source = audioCtx.createMediaElementSource(audio); analyser = new AnalyserNode(audioCtx, {fftSize:1024}); source.connect(analyser); analyser.connect(audioCtx.destination); dataArray = new Uint8Array(analyser.frequencyBinCount); } catch(e){}
+
+let running = false;
+function fadeInAudio(d=1000){const steps=30,dt=d/steps;let i=0;const t=0.75;let iv=setInterval(()=>{i++;audio.volume=t*i/steps;if(i>=steps){audio.volume=t;clearInterval(iv);}},dt);}
+function fadeOutAudio(d=1500){const steps=30,dt=d/steps;let i=0,s=audio.volume;let iv=setInterval(()=>{i++;audio.volume=s*(1-i/steps);if(i>=steps){audio.volume=0;clearInterval(iv);audio.pause();}},dt);}
+
+(async()=>{try{if(audioCtx&&audioCtx.state==="suspended")await audioCtx.resume();await audio.play();}catch(e){}fadeInAudio(1000);canvas.style.opacity="0.85";running=true;animate();})();
+
+class Particle{constructor(x,y,s,c,dir){this.x=x;this.y=y;this.size=s;this.color=c;this.dir=dir;this.alpha=0.8;}
+update(){this.x+=this.dir==="right"?1.2: -1.2;this.y+=Math.sin(this.x*0.01)*(this.dir==="right"?0.5:-0.5);if(this.x>canvas.width+20||this.x<-20){this.reset();}}
+reset(){this.x=this.dir==="right"?-10:canvas.width+10;this.y=this.dir==="right"?canvas.height*0.35+Math.random()*-150:canvas.height*0.65+Math.random()*150;this.size=Math.random()*3+1.2;}
+draw(){ctx.globalAlpha=this.alpha;ctx.fillStyle=this.color;ctx.shadowBlur=8;ctx.shadowColor=this.color;ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}}
+const particles=[];
+for(let i=0;i<60;i++){const dir=i%2===0?"right":"left";const y=dir==="right"?canvas.height*0.35+Math.random()*-150:canvas.height*0.65+Math.random()*150;particles.push(new Particle(Math.random()*canvas.width,y,Math.random()*3+1.2,"rgba(220,220,220,0.8)",dir));}
+
+function drawWaves(tick){
+const card=document.querySelector('.card-auth').getBoundingClientRect();
+const leftX=card.left, rightX=card.right;
+const midY=canvas.height/2;
+const topOffset=-10, bottomOffset=10;
+ctx.lineWidth=2.4; ctx.shadowBlur=20; ctx.shadowColor="rgba(220,220,220,0.8)";
+const grad=ctx.createLinearGradient(0,0,canvas.width,0);
+grad.addColorStop(0,"rgba(180,180,180,0.5)");
+grad.addColorStop(0.5,"rgba(200,200,200,0.65)");
+grad.addColorStop(1,"rgba(230,230,230,0.5)");
+ctx.strokeStyle=grad;
+
+function drawPath(offset,dirSpeed,ampMod){
+  ctx.beginPath();
+  const wl=160, sp=0.01*dirSpeed, amp=40*ampMod;
+  for(let x=0;x<canvas.width;x+=5){
+    if(x>leftX&&x<rightX){
+      if(x<leftX+5){
+        const y=midY+offset+Math.sin(x/wl+tick*sp)*amp;
+        const ctrlY=midY+(offset+amp*0.5);
+        ctx.lineTo(leftX,(y+ctrlY)/2);
+      }
+      if(x>rightX-5){
+        const y=midY+offset+Math.sin(x/wl+tick*sp)*amp;
+        ctx.lineTo(rightX,(y));
+      }
+      continue;
+    }
+    const y=midY+offset+Math.sin(x/wl+tick*sp)*amp;
+    ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+drawPath(topOffset,1.05,0.75);
+drawPath(bottomOffset,0.9,0.75);
+}
+
+function animate(){
+if(!running)return;requestAnimationFrame(animate);
+ctx.clearRect(0,0,canvas.width,canvas.height);
+drawWaves(performance.now()/16);
+for(const p of particles){p.update();p.draw();}
+}
+
+const email=document.getElementById('email'),pass=document.getElementById('password'),btn=document.getElementById('loginBtn'),msg=document.getElementById('loginMsg');
+if(btn){btn.addEventListener('click',async()=>{if(!window.firebase||!firebase.auth){msg.textContent="Firebase not loaded.";return;}try{await firebase.auth().signInWithEmailAndPassword(email.value,pass.value);}catch(err){msg.textContent=err.message||"Login failed.";}});}
+if(window.firebase&&firebase.auth){firebase.auth().onAuthStateChanged(u=>{if(u){fadeOutAudio(1500);running=false;document.getElementById('visualizer').style.opacity=0;const o=document.getElementById('oathAcceptedOverlay');o.style.display='flex';setTimeout(()=>{o.style.display='none';window.location.href='index.html';},1500);}});}
+</script>
+</body>
+</html>
