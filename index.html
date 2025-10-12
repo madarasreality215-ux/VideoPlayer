@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MediaTracker Pro</title>
+<!-- Build 2025-10-12 (full + progress) | Auth+Firestore+Storage | Discord-style folders | Drag-move+Trash overlay | FixTweet preview | Progress bars -->
+<style>
+:root{--bg:#0b1220;--card:#0f1724;--card2:#141b2b;--txt:#e6eef9;--muted:rgba(230,238,249,.65);--acc:#7c3aed;--accH:#6d28d9;--thin:rgba(255,255,255,.15);--secBG:rgba(255,255,255,.03);--secBD:rgba(255,255,255,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica Neue,Arial}
+header{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:12px 16px}
+.title{margin:0;font-weight:700;font-size:18px;letter-spacing:.2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:42px;padding:10px 16px;border-radius:8px;border:none;font-weight:600;color:#fff;background:var(--acc);cursor:pointer;text-decoration:none;transition:background .2s,transform .1s}
+.btn:hover{background:var(--accH);transform:translateY(-1px)}
+.btn-matte{background:var(--card);color:var(--txt);border:1px solid var(--thin)}
+.btn-matte:hover{background:#1a2333}
+.container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+@media(max-width:900px){.container{grid-template-columns:1fr}}
+.sidebar,.main{background:var(--card);padding:12px;border-radius:12px}
+input,select,textarea{width:100%;padding:8px 10px;background:var(--card2);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--txt);font-size:14px}
+input::placeholder,textarea::placeholder{color:rgba(230,238,249,.6)}
+.section{background:var(--secBG);border:1px solid var(--secBD);border-radius:10px;padding:12px;margin-bottom:16px}
+.section h3{margin:0 0 8px;font-size:15px;color:var(--acc);font-weight:700}
+.row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.row:last-child{margin-bottom:0}
+.empty{font-size:13px;color:var(--muted);text-align:center}
+.folders{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto;padding-right:4px}
+.frow{position:relative;display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background:rgba(255,255,255,.02)}
+.frow:hover{background:rgba(255,255,255,.05)}
+.fchev{width:16px;text-align:center;opacity:.8;transform:rotate(0);transition:transform .2s ease}
+.frow.collapsed>.fchev{transform:rotate(0)}
+.frow.expanded>.fchev{transform:rotate(90deg)}
+.fname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fdepth{padding-left:0}
+.fctrl{position:absolute;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .2s ease}
+.frow:hover .fctrl{opacity:1}
+.fctrl button{background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--txt);border-radius:6px;height:28px;padding:0 8px;cursor:pointer}
+.children{overflow:hidden;max-height:0;opacity:.0;transition:max-height .25s ease,opacity .25s ease}
+.children.show{opacity:1}
+.videoList{display:flex;flex-direction:column;gap:8px}
+.vitem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,.02);cursor:grab;transition:background .2s}
+.vitem:hover{background:rgba(255,255,255,.05)}
+.vitem[draggable=true]{user-select:none}
+.thumb{width:120px;height:72px;background:#000;border-radius:8px;overflow:hidden;flex-shrink:0}
+.thumb img,.thumb video{width:100%;height:100%;object-fit:cover}
+.meta{flex:1;min-width:0}
+.meta h4{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta p{margin:4px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);animation:fade .6s ease}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.7);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.7)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+@keyframes fade{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+/* Popup viewer */
+.popup{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);justify-content:center;align-items:center;opacity:0;transition:opacity .3s}
+.popup.show{display:flex;opacity:1}
+.popwrap{position:relative;background:#000;border-radius:12px;max-width:90%;max-height:90%;box-shadow:0 0 40px rgba(0,0,0,.8)}
+.popwrap video{width:100%;height:auto;max-height:85vh;border-radius:12px;display:block}
+.closeX{position:absolute;top:-40px;right:0;color:#fff;font-size:36px;font-weight:700;background:none;border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.closeX:hover{color:#ff6b6b;background:rgba(255,255,255,.1);border-radius:50%}
+/* Floating Trash Overlay */
+.trashOv{position:absolute;left:16px;right:16px;bottom:24px;padding:14px;background:rgba(239,68,68,.08);border:2px dashed rgba(239,68,68,.6);border-radius:12px;text-align:center;color:#ef4444;font-weight:600;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s,box-shadow .3s;backdrop-filter:blur(6px);box-shadow:0 0 20px rgba(239,68,68,.15)}
+.trashOv.active{opacity:1;transform:translateY(-6px);pointer-events:auto}
+.trashOv.drag-over{background:rgba(239,68,68,.15);transform:scale(1.05);box-shadow:0 0 25px rgba(239,68,68,.4)}
+
+/* Progress bar */
+.upload-progress{height:5px;background:rgba(255,255,255,.1);border-radius:10px;overflow:hidden;margin-top:6px}
+.upload-progress .bar{width:0%;height:100%;background:var(--acc);transition:width .2s ease}
+.fade-out{opacity:0;transition:opacity .5s ease}
+.fade-out-preview{opacity:0;transition:opacity .8s ease}
+</style>
+</head>
+<body>
+<header><h1 class="title">📱 MediaTracker Pro</h1><div style="display:flex;gap:8px"><a href="stats.html" class="btn btn-matte">📊 Stats</a><button id="signOutBtn" class="btn btn-matte">🚪 Sign Out</button></div></header>
+<div class="container">
+  <aside class="sidebar" id="sidebar" style="position:relative">
+    <!-- Sync -->
+    <div class="section"><button id="syncBtn" class="btn" style="width:100%">🔄 Sync Now</button><div class="status" style="margin-top:8px"><span class="dot" id="syncDot"></span><span id="syncText">Ready to sync</span></div></div>
+    <!-- Folder Management -->
+    <div class="section"><h3>📁 Folder Management</h3><div class="row"><input id="newFolderName" placeholder="New folder name"></div><button id="addFolderBtn" class="btn" style="width:100%">📁 Add Folder</button></div>
+    <!-- Your Folders -->
+    <div class="section"><h3>📂 Your Folders</h3><div id="folders" class="folders"><div class="empty" id="noFolders">No folders yet. Create one above!</div></div></div>
+    <!-- Add Media -->
+    <div class="section"><h3>➕ Add Media</h3><div class="row"><button id="addVideoBtn" class="btn" style="flex:1">🎥 Add Videos</button><button id="addPhotoBtn" class="btn" style="flex:1;background:#10b981">📷 Add Photos</button></div><div class="empty" style="margin-top:6px">Supports MP4, WebM, MOV, JPG, PNG, GIF</div></div>
+    <!-- Twitter/X Downloader -->
+    <div class="section"><h3>🐦 Twitter/X Downloader</h3><div class="row"><input id="twUrl" placeholder="Paste Twitter/X URL here"></div><div class="row"><button id="twFetch" class="btn" style="width:100%">Fetch Twitter Media</button></div><div class="status" style="margin-top:8px"><span class="dot" id="apiDot" style="background:#60a5fa;box-shadow:0 0 0 0 rgba(96,165,250,.7)"></span><span id="apiText">Ready to detect media</span></div></div>
+    <!-- Tweet Preview (replaces Multi-Platform section) -->
+    <div id="tweetPreviewSection" class="section" style="display:none;">
+      <h3>🎞️ Tweet Media Preview</h3>
+      <div id="tweetPreview" class="vitem" style="cursor:default;">
+        <div class="thumb"><video id="tweetPreviewVideo" muted autoplay loop playsinline></video></div>
+        <div class="meta"><h4 id="tweetPreviewTitle">Previewing Tweet Media…</h4><p>Detected video • Ready to download</p></div>
+      </div>
+      <button id="tweetDownloadBtn" class="btn" style="width:100%;margin-top:10px;">⬇️ Download to VideoList</button>
+    </div>
+    <div id="trashBinOverlay" class="trashOv">🗑️ Drop to Delete Media</div>
+  </aside>
+  <main class="main">
+    <div class="section"><div class="row"><input type="search" id="searchInput" placeholder="🔍 Search videos..."><button id="sortBtn" class="btn">📅 Sort: Newest</button></div></div>
+    <div id="videoList" class="videoList"></div>
+  </main>
+</div>
+<!-- Viewer -->
+<div id="viewer" class="popup"><div class="popwrap"><button class="closeX" id="closePopup">&times;</button><video id="viewerVideo" controls playsinline></video></div></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+
+<script>
+/* Firebase config */
+const firebaseConfig={apiKey:"AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",authDomain:"personalplayer-c8d3b.firebaseapp.com",projectId:"personalplayer-c8d3b",storageBucket:"personalplayer-c8d3b.appspot.com",messagingSenderId:"396785312809",appId:"1:396785312809:web:02290950ec22a13165a838",measurementId:"G-2Q8W3GJF1S"};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(),db=firebase.firestore(),storage=firebase.storage();
+
+/* State */
+let me=null,currentFolderId="",sortOrder="newest";
+const foldersMap=new Map(),mediaMap=new Map(),expandedSet=new Set();
+
+/* DOM */
+const syncDot=document.getElementById('syncDot'),syncText=document.getElementById('syncText'),foldersEl=document.getElementById('folders'),noFolders=document.getElementById('noFolders'),videoListEl=document.getElementById('videoList');
+
+/* Auth */
+auth.onAuthStateChanged(u=>{if(!u){location.href='login.html';return}me=u;boot()});
+document.getElementById('signOutBtn').onclick=()=>auth.signOut().then(()=>location.href='login.html');
+
+/* Boot */
+let unsubF=null,unsubM=null;
+function boot(){wireUI();attachRT(me.uid)}
+
+/* UI wiring */
+function setSyncStatus(s){if(s==='syncing'){syncText.textContent='Syncing…';syncDot.style.background='#f59e0b'}else if(s==='error'){syncText.textContent='Sync error';syncDot.style.background='#ef4444'}else{syncText.textContent='Ready to sync';syncDot.style.background='#22c55e'}}
+function setApiStatus(s){const t=document.getElementById('apiText'),d=document.getElementById('apiDot');if(s==='busy'){t.textContent='Fetching tweet...';d.style.background='#f59e0b'}else if(s==='ok'){t.textContent='Media found!';d.style.background='#22c55e'}else if(s==='err'){t.textContent='Failed to detect media';d.style.background='#ef4444'}else{t.textContent='Ready to detect media';d.style.background='#60a5fa'}}
+function wireUI(){
+  document.getElementById('syncBtn').onclick=()=>{setSyncStatus('syncing');setTimeout(()=>setSyncStatus(''),900)};
+  const nf=document.getElementById('newFolderName');
+  document.getElementById('addFolderBtn').onclick=async()=>{
+    const name=(nf.value||'').trim();if(!name)return;
+    const tempId='tmp_'+Date.now();instantFolder({id:tempId,name,parentId:currentFolderId});
+    nf.value='';
+    try{await db.collection('folders').add({userId:me.uid,name,parentId:currentFolderId,createdAt:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){setSyncStatus('error')}
+  };
+  document.getElementById('addVideoBtn').onclick=()=>pickFiles('video');
+  document.getElementById('addPhotoBtn').onclick=()=>pickFiles('image');
+  document.getElementById('searchInput').oninput=renderVideos;
+  document.getElementById('sortBtn').onclick=()=>{sortOrder=sortOrder==='newest'?'oldest':'newest';document.getElementById('sortBtn').textContent=sortOrder==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';renderVideos()};
+  document.getElementById('closePopup').onclick=closeViewer;
+  document.getElementById('twFetch').onclick=()=>fetchTweet();
+  document.getElementById('tweetDownloadBtn').onclick=()=>downloadPreview();
+}
+
+/* Realtime */
+function attachRT(uid){
+  unsubF&&unsubF();unsubM&&unsubM();
+  unsubF=db.collection('folders').where('userId','==',uid).orderBy('createdAt','asc').onSnapshot(s=>{foldersMap.clear();s.forEach(d=>foldersMap.set(d.id,{id:d.id,...d.data()}));renderFolders()});
+  unsubM=db.collection('media').where('userId','==',uid).orderBy('createdAt','desc').onSnapshot(s=>{mediaMap.clear();s.forEach(d=>mediaMap.set(d.id,{id:d.id,...d.data()}));renderVideos()})
+}
+
+/* Folders rendering */
+function instantFolder(f){foldersMap.set(f.id,f);renderFolders()}
+function renderFolders(){
+  const roots=[];foldersMap.forEach(v=>{if(!v.parentId)roots.push(v)});
+  noFolders.style.display=roots.length?\"none\":\"block\";
+  const out=[];
+  function rowHtml(n,depth){
+    const expanded=expandedSet.has(n.id);
+    return `<div class="frow ${expanded?'expanded':'collapsed'}" data-fid="${n.id}" style="padding-left:${8+depth*14}px"><span class="fchev">▶</span><span class="fname">📁 ${esc(n.name)}</span><div class="fctrl"><button data-act="add">➕</button><button data-act="ren">✏️</button><button data-act="del">🗑️</button></div></div><div class="children ${expanded?'show':''}" data-ch-of="${n.id}" style="max-height:${expanded?9999:0}px">${childHtml(n.id,depth+1)}</div>`
+  }
+  function childHtml(pid,depth){let s='';foldersMap.forEach(ch=>{if(ch.parentId===pid){s+=rowHtml(ch,depth)}});return s}
+  roots.forEach(r=>out.push(rowHtml(r,0)));
+  foldersEl.innerHTML=out.join('');
+  // Handlers
+  foldersEl.querySelectorAll('.frow').forEach(el=>{
+    const id=el.getAttribute('data-fid');
+    el.onclick=e=>{if(e.target.closest('.fctrl'))return;toggleFolder(id)};
+    el.querySelectorAll('.fctrl button').forEach(b=>{b.onclick=(ev)=>{ev.stopPropagation();const act=b.getAttribute('data-act');if(act==='add')inlineAddSub(id,el);if(act==='ren')inlineRename(id,el);if(act==='del')confirmDeleteFolder(id)}});
+    el.ondragover=ev=>{ev.preventDefault();el.style.outline=`1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--acc')}`};
+    el.ondragleave=()=>{el.style.outline='none'};
+    el.ondrop=e=>{e.preventDefault();el.style.outline='none';const mid=e.dataTransfer.getData('media-id');if(mid)moveMediaToFolder(mid,id)}
+  })
+}
+function toggleFolder(id){if(expandedSet.has(id))expandedSet.delete(id);else expandedSet.add(id);renderFolders();renderVideos()}
+function inlineAddSub(parentId,rowEl){
+  const inp=document.createElement('input');inp.placeholder='New subfolder name';inp.style.marginTop='6px';
+  const wrap=document.createElement('div');wrap.style.paddingLeft='28px';wrap.appendChild(inp);
+  rowEl.insertAdjacentElement('afterend',wrap);inp.focus();
+  const save=async()=>{
+    const name=(inp.value||'').trim();wrap.remove();if(!name)return;
+    const tmp='tmp_'+Date.now();instantFolder({id:tmp,name,parentId});
+    try{await db.collection('folders').add({userId:me.uid,name,parentId,createdAt:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){setSyncStatus('error')}
+  };
+  inp.onkeydown=e=>{if(e.key==='Enter')save();if(e.key==='Escape')wrap.remove()};inp.onblur=save
+}
+function inlineRename(id,rowEl){
+  const f=foldersMap.get(id);if(!f)return;
+  const nameEl=rowEl.querySelector('.fname');const cur=f.name;
+  const inp=document.createElement('input');inp.value=cur;inp.style.maxWidth='70%';nameEl.replaceWith(inp);inp.focus();
+  const save=async(commit)=>{
+    const nv=(inp.value||'').trim();
+    const span=document.createElement('span');span.className='fname';span.textContent='📁 '+(commit&&nv?nv:cur);inp.replaceWith(span);
+    if(commit&&nv&&nv!==cur){foldersMap.set(id,{...f,name:nv});renderFolders();try{await db.collection('folders').doc(id).update({name:nv})}catch(e){setSyncStatus('error')}}
+  };
+  inp.onkeydown=e=>{if(e.key==='Enter')save(true);if(e.key==='Escape')save(false)};inp.onblur=()=>save(true)
+}
+async function confirmDeleteFolder(id){if(!confirm('⚠️ Delete this folder and all its contents? This cannot be undone.'))return;await deleteFolderRecursive(id);renderFolders();renderVideos()}
+async function deleteFolderRecursive(id){const toDel=[id];foldersMap.forEach(f=>{if(f.parentId===id)toDel.push(f.id)});for(const fid of toDel){await deleteFolderMedia(fid);try{await db.collection('folders').doc(fid).delete()}catch(e){/* ignore */}}}
+async function deleteFolderMedia(fid){const q=await db.collection('media').where('userId','==',me.uid).where('folderId','==',fid).get();for(const d of q.docs){const m=d.data();try{await storage.refFromURL(m.url).delete()}catch(e){}await d.ref.delete()}}
+
+/* Media upload & list */
+function pickFiles(type){
+  const input=document.createElement('input');input.type='file';input.multiple=true;input.accept= type==='video'?'video/*':'image/*';
+  input.onchange=e=>handleFiles(Array.from(e.target.files||[]),type);input.click()
+}
+async function handleFiles(files,type){
+  for(const file of files){
+    const id='tmp_'+Date.now()+Math.random().toString(16).slice(2);
+    const url=URL.createObjectURL(file);
+    mediaMap.set(id,{id,name:file.name,type,local:true,url,createdAt:{toMillis:()=>Date.now()}});
+    renderVideos();
+    // Start upload with progress
+    uploadToFirebase(id,file,type);
+  }
+}
+function setProgress(tmpId,pct){
+  const bar=document.querySelector(`[data-mid='${tmpId}'] .upload-progress .bar`);
+  if(bar){bar.style.width=pct+'%'}
+}
+async function uploadToFirebase(tmpId,file,type){
+  try{
+    const path=`users/${me.uid}/${type}s/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9_.-]/g,'_')}`;
+    const ref=storage.ref().child(path);
+    const task=ref.put(file);
+    task.on('state_changed', (snap)=>{
+      const pct=(snap.bytesTransferred/snap.totalBytes)*100;
+      setProgress(tmpId, pct);
+    }, (e)=>{console.error(e);setSyncStatus('error')}, async ()=>{
+      const url=await ref.getDownloadURL();
+      await db.collection('media').add({userId:me.uid,name:file.name,url,type,folderId:currentFolderId||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      setProgress(tmpId, 100);
+      const prog=document.querySelector(`[data-mid='${tmpId}'] .upload-progress`);
+      if(prog){prog.classList.add('fade-out')}
+      setTimeout(()=>{mediaMap.delete(tmpId);renderVideos()}, 1000);
+    });
+  }catch(e){setSyncStatus('error')}
+}
+function renderVideos(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+  let items=[...mediaMap.values()];
+  if(currentFolderId)items=items.filter(m=>(m.folderId||'')===currentFolderId);
+  if(q)items=items.filter(m=>(m.name||'').toLowerCase().includes(q));
+  items.sort((a,b)=>{const at=a.createdAt?.toMillis?.()||0,bt=b.createdAt?.toMillis?.()||0;return sortOrder==='newest'?bt-at:at-bt});
+  if(!items.length){
+    videoListEl.innerHTML=currentFolderId?`<div class="empty">No media in "${esc(foldersMap.get(currentFolderId)?.name||'Selected Folder')}" yet. Add some videos or photos to this folder!</div>`:'<div class="empty">No media yet. Add some videos or photos to get started!</div>';return}
+  videoListEl.innerHTML=items.map(m=>{
+    const isLocal=!!m.local;
+    const progressHTML=isLocal?`<div class="upload-progress"><div class="bar" style="width:0%"></div></div>`:'';
+    return `<div class="vitem" data-mid="${m.id}" draggable="true">
+      <div class="thumb">${m.type==='image'?`<img src="${m.url}" alt="${esc(m.name)}">`:`<video src="${m.url}" muted></video>`}</div>
+      <div class="meta">
+        <h4>${m.type==='image'?'🖼️':'🎞️'} ${esc(m.name)}</h4>
+        <p>${(m.type||'').toUpperCase()} • ${m.createdAt?.toMillis?new Date(m.createdAt.toMillis()).toLocaleString():''}</p>
+        ${progressHTML}
+      </div>
+    </div>`
+  }).join('');
+  videoListEl.querySelectorAll('.vitem').forEach(el=>{
+    const id=el.getAttribute('data-mid');
+    el.onclick=()=>openViewer(id);
+    el.ondragstart=e=>{e.dataTransfer.setData('media-id',id);showTrash(true)};
+    el.ondragend=()=>showTrash(false)
+  })
+}
+
+/* Viewer */
+function openViewer(id){
+  const m=mediaMap.get(id);if(!m)return;
+  const v=document.getElementById('viewerVideo');
+  if(m.type==='image'){v.removeAttribute('src');v.setAttribute('poster',m.url)}
+  else{v.setAttribute('src',m.url);v.setAttribute('poster','');v.play?.()}
+  document.getElementById('viewer').classList.add('show')
+}
+function closeViewer(){const v=document.getElementById('viewerVideo');v.pause?.();document.getElementById('viewer').classList.remove('show')}
+
+/* Drag to move */
+async function moveMediaToFolder(mid,fid){
+  const m=mediaMap.get(mid);if(!m)return;
+  mediaMap.set(mid,{...m,folderId:fid});renderVideos();
+  try{await db.collection('media').doc(mid).update({folderId:fid})}catch(e){/* temp id ignore */}
+}
+
+/* Floating Trash Overlay */
+const trash=document.getElementById('trashBinOverlay');
+function showTrash(b){trash.classList.toggle('active',!!b)}
+trash.ondragover=e=>{e.preventDefault();trash.classList.add('drag-over')};
+trash.ondragleave=()=>trash.classList.remove('drag-over');
+trash.ondrop=async e=>{
+  e.preventDefault();trash.classList.remove('drag-over');
+  const mid=e.dataTransfer.getData('media-id');const m=mediaMap.get(mid);if(!m)return;
+  const ok=confirm('⚠️ Delete this media? This action cannot be undone.');if(!ok)return;
+  document.querySelector(`[data-mid='${mid}']`)?.remove();
+  try{
+    if(m.url&&m.url.startsWith('http')){try{await storage.refFromURL(m.url).delete()}catch(err){}}
+    const ref=db.collection('media').doc(mid);
+    try{await ref.delete()}catch(err){}mediaMap.delete(mid)
+  }catch(err){setSyncStatus('error')}
+};
+
+/* FixTweet preview + upload */
+async function fxGet(tw){
+  const ep1=`https://api.fxtwitter.com/${tw}`,ep2=`https://api.vxtwitter.com/${tw}`;
+  let r=await fetch(ep1);if(!r.ok)r=await fetch(ep2);
+  const j=await r.json();if(!j?.tweet)throw new Error('No tweet');return j
+}
+let currentPreviewUrl=null;
+async function fetchTweet(){
+  const url=(document.getElementById('twUrl').value||'').trim();
+  if(!url)return;setApiStatus('busy');
+  try{
+    const data=await fxGet(url);
+    const medias=(data.tweet.media?.videos||data.tweet.media?.all||[]);
+    if(!medias?.length)throw new Error('No media');
+    // Choose highest bitrate mp4
+    let best=null;
+    const variants=medias[0].variants||[];
+    for(const v of variants){if(/mp4/.test(v.content_type||'')){if(!best||(+v.bitrate>(+best.bitrate||0)))best=v}}
+    const src=best?.url || medias[0].url || medias[0].download_url;
+    if(!src)throw new Error('No video URL');
+    currentPreviewUrl=src;
+    const v=document.getElementById('tweetPreviewVideo');v.src=src;v.load();
+    document.getElementById('tweetPreviewSection').style.display='block';
+    setApiStatus('ok');
+  }catch(e){console.error(e);setApiStatus('err')}
+}
+async function downloadPreview(){
+  if(!currentPreviewUrl)return;
+  try{
+    await downloadDisplayUpload(currentPreviewUrl);
+    document.getElementById('tweetPreviewSection').style.display='none';
+    document.getElementById('twUrl').value='';
+    setApiStatus('')
+  }catch(e){console.error(e);setApiStatus('err')}
+}
+
+/* Generic download->display->upload used elsewhere */
+async function downloadDisplayUpload(src){
+  const res=await fetch(src);if(!res.ok)throw new Error('fetch fail');
+  const blob=await res.blob();
+  const type=/image\//.test(blob.type)?'image':'video';
+  const file=new File([blob], (src.split('/').pop()||`media_${Date.now()}.${type==='image'?'jpg':'mp4'}`), {type:blob.type|| (type==='image'?'image/jpeg':'video/mp4')});
+  const id='tmp_'+Date.now()+Math.random().toString(16).slice(2);
+  const local=URL.createObjectURL(file);
+  mediaMap.set(id,{id,name:file.name,type,local:true,url:local,createdAt:{toMillis:()=>Date.now()}});
+  renderVideos();
+  uploadToFirebase(id,file,type)
+}
+
+/* Utils */
+const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+</script>
+</body>
+</html>
