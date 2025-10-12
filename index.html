@@ -4,6 +4,29 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>MediaTracker Pro — Local Only (IndexedDB + LocalStorage)</title>
+
+
+<!-- Firebase Auth Redirect -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+    authDomain: "personalplayer-c8d3b.firebaseapp.com",
+    projectId: "personalplayer-c8d3b",
+    storageBucket: "personalplayer-c8d3b.appspot.com",
+    messagingSenderId: "396785312809",
+    appId: "1:396785312809:web:02290950ec22a13165a838",
+    measurementId: "G-2Q8W3GJF1S"
+  };
+  firebase.initializeApp(firebaseConfig);
+  firebase.auth().onAuthStateChanged((user) => {
+    if (!user) {
+      window.location.href = "login.html";
+    }
+  });
+</script>
+
 <style>
 :root{--bg:#0b1220;--card:#0f1724;--card2:#141b2b;--txt:#e6eef9;--muted:rgba(230,238,249,.7);--acc:#7c3aed;--accH:#6d28d9;--thin:rgba(255,255,255,.15);--secBG:rgba(255,255,255,.03);--secBD:rgba(255,255,255,.08)}
 *{box-sizing:border-box}
@@ -52,12 +75,16 @@ input::placeholder{color:rgba(230,238,249,.6)}
 .upload-progress .bar{width:0%;height:100%;background:var(--acc);transition:width .2s ease}
 .fade-out{opacity:0;transition:opacity .5s ease}
 /* Viewer */
-.viewer-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:1000}
+.viewer-full{display:none;position:fixed;inset:0;background:linear-gradient(180deg, rgba(8,10,18,.80), rgba(8,10,18,.60));backdrop-filter:blur(3px);opacity:0;transition:opacity .22s ease;pointer-events:none;z-index:1000}
 .viewer-full.show{display:block;opacity:1;pointer-events:auto}
-.viewer-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
-.viewer-video{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 0 60px rgba(0,0,0,.6)}
-.viewer-toolbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;padding:0 16px;background:linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,0));color:#e6eef9;}
+.viewer-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px}
+.viewer-video{max-width:min(100%, calc(100vw - 40px));max-height:min(92vh, 100%);border-radius:14px;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.viewer-toolbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+  background:linear-gradient(180deg, rgba(0,0,0,.7), rgba(0,0,0,0));color:#e6eef9;border-bottom:1px solid rgba(255,255,255,.07)}
 .viewer-title{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer-actions{display:flex;gap:8px;align-items:center}
+.vbtn{height:32px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-weight:700}
+.vbtn.danger{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.35)}
 /* Retry */
 .retry-wrap{position:absolute;inset:auto auto 24px 24px;display:none}
 .retry-btn{height:36px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
@@ -130,8 +157,11 @@ input::placeholder{color:rgba(230,238,249,.6)}
 <div id="viewer" class="viewer-full">
   <div class="viewer-wrap">
     <div class="viewer-toolbar">
-      <button class="viewer-back" id="viewerBack">← Back</button>
       <div class="viewer-title" id="viewerTitle"></div>
+      <div class="viewer-actions">
+        <a id="viewerDownload" class="vbtn" download>⬇️ Download</a>
+        <button class="vbtn danger" id="viewerBack">✕ Exit</button>
+      </div>
     </div>
     <video id="viewerVideo" class="viewer-video" controls playsinline muted></video>
     <div class="retry-wrap" id="retryWrap"><button class="retry-btn" id="retryBtn">↻ Retry Play</button></div>
@@ -205,7 +235,10 @@ const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 const genId = (p="id") => p+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
 function saveState(){
   localStorage.setItem(LS_KEYS.folders, JSON.stringify([...foldersMap.values()]));
-  const meta = [...mediaMap.values()].map(({id,name,type,folderId,createdAt,size})=>({id,name,type,folderId,createdAt,size}));
+  const meta = [...mediaMap.values()].map(({id,name,type,folderId,createdAt,size,thumbDataUrl})=>({id,name,type,folderId,createdAt,size,thumbDataUrl}));
+  localStorage.setItem(LS_KEYS.media, JSON.stringify(meta));
+  localStorage.setItem(LS_KEYS.expanded, JSON.stringify([...expandedSet]));
+})=>({id,name,type,folderId,createdAt,size}));
   localStorage.setItem(LS_KEYS.media, JSON.stringify(meta));
   localStorage.setItem(LS_KEYS.expanded, JSON.stringify([...expandedSet]));
 }
@@ -336,6 +369,70 @@ async function deleteFolderMedia(fid){
   for(const id of ids){ await deleteMedia(id); }
 }
 
+
+/* ====== Thumbnail capture (first-frame for videos, canvas resize for images) ====== */
+async function captureFirstFrameFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.preload='metadata'; v.muted=true; v.src=url;
+    const cleanup=()=>{ try{ v.pause(); v.removeAttribute('src'); v.load(); }catch(_){}
+      URL.revokeObjectURL(url);
+    };
+    v.addEventListener('loadeddata', ()=>{
+      try{ v.currentTime = 0.01; }catch(e){ /* some containers might not seek to 0 */ }
+    }, { once:true });
+    v.addEventListener('seeked', ()=>{
+      try{
+        const c = document.createElement('canvas');
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(v, 0, 0, c.width, c.height);
+        const dataUrl = c.toDataURL('image/jpeg', 0.85);
+        cleanup();
+        resolve(dataUrl);
+      }catch(err){ cleanup(); reject(err); }
+    }, { once:true });
+    v.addEventListener('error', (e)=>{ cleanup(); reject(e); }, { once:true });
+  });
+}
+async function imageThumbFromFile(file, maxW=640, quality=0.85){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image(); img.onload=()=>{
+      try{
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', quality);
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      }catch(err){ URL.revokeObjectURL(url); reject(err); }
+    };
+    img.onerror=(e)=>{ URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+async function ensureThumbForItem(m){
+  if(m.thumbDataUrl) return m.thumbDataUrl;
+  try{
+    const blob = await idbGet('media:'+m.id);
+    if(!blob) return '';
+    if((m.type||'').startsWith('video')){
+      const file = new File([blob], m.name || ('v_'+m.id+'.mp4'), { type: blob.type || 'video/mp4' });
+      const dataUrl = await captureFirstFrameFromFile(file);
+      m.thumbDataUrl = dataUrl; saveState(); renderVideos(); return dataUrl;
+    }else if((m.type||'').startsWith('image')){
+      const file = new File([blob], m.name || ('i_'+m.id+'.jpg'), { type: blob.type || 'image/jpeg' });
+      const dataUrl = await imageThumbFromFile(file);
+      m.thumbDataUrl = dataUrl; saveState(); renderVideos(); return dataUrl;
+    }
+  }catch(_){}
+  return '';
+}
+
 /* ====== Media: Add / Progress / Save ====== */
 function pickFiles(type){
   const input=document.createElement('input');
@@ -352,9 +449,38 @@ async function handleFiles(files,type){
 async function addLocalWithProgress(file,type){
   const id = genId('med');
   const size = file.size || 0;
-  // Create immediate temp preview
+
+  // Make deterministic MIME heading for type
+  let mimeType = file.type || (type==='image' ? 'image/jpeg' : 'video/mp4');
   const tempUrl = URL.createObjectURL(file);
-  mediaMap.set(id,{ id, name:file.name, type, folderId:currentFolderId||"", createdAt:Date.now(), size, url:tempUrl });
+
+  // Precompute thumbnail
+  let thumbDataUrl = '';
+  try{
+    if(type==='video' || /^video\//.test(mimeType)){
+      thumbDataUrl = await captureFirstFrameFromFile(file);
+    }else if(type==='image' || /^image\//.test(mimeType)){
+      thumbDataUrl = await imageThumbFromFile(file);
+    }
+  }catch(_){ /* ignore thumb errors */ }
+
+  mediaMap.set(id,{ id, name:file.name, type, folderId:currentFolderId||"", createdAt:Date.now(), size, url:tempUrl, thumbDataUrl });
+  renderVideos(); saveState();
+
+  // 0–200MB -> 2–10s (clamped)
+  const MB = size / (1024*1024);
+  const dur = Math.round(2000 + Math.min(8000, (MB/200)*8000));
+  await simulateProgress(id, dur);
+
+  try{
+    await idbPut('media:'+id, file);
+    const prog = document.querySelector(`[data-mid='${id}'] .upload-progress`);
+    if(prog){ prog.classList.add('fade-out'); setTimeout(()=>prog.remove(),600); }
+  }catch(err){
+    console.error('Saving to IndexedDB failed', err);
+    alert('Saving this file locally failed. Check console for details.');
+  }
+});
   renderVideos(); saveState();
 
   // 0–200MB -> 2–10s (clamped)
@@ -403,6 +529,41 @@ function renderVideos(){
   }
   videoListEl.innerHTML = items.map(m=>{
     const progressHTML=`<div class="upload-progress"><div class="bar" style="width:0%"></div></div>`;
+    const thumbSrc = m.thumbDataUrl || '';
+    const thumbHTML = `<img data-thumb-id="${m.id}" ${thumbSrc ? `src="${thumbSrc}"` : ''} alt="${esc(m.name)}">`;
+    return `<div class="vitem" data-mid="${m.id}" draggable="true">
+              <div class="thumb">${thumbHTML}</div>
+              <div class="meta">
+                <h4>${(m.type||'').startsWith('image')?'🖼️':'🎞️'} ${esc(m.name)}</h4>
+                <p>${(m.type||'').toUpperCase()} • ${new Date(m.createdAt).toLocaleString()}</p>
+                ${progressHTML}
+              </div>
+            </div>`;
+  }).join('');
+
+  // Wire items
+  videoListEl.querySelectorAll('.vitem').forEach(el=>{
+    const id=el.getAttribute('data-mid');
+    el.onclick=()=>openViewer(id);
+    el.ondragstart=e=>{ e.dataTransfer.setData('media-id',id); showTrash(true) };
+    el.ondragend=()=>showTrash(false);
+  });
+
+  // Backfill missing thumbs asynchronously
+  videoListEl.querySelectorAll('[data-thumb-id]').forEach(async node=>{
+    const id = node.getAttribute('data-thumb-id');
+    const m = mediaMap.get(id);
+    if(!m) return;
+    if(!m.thumbDataUrl){
+      const dataUrl = await ensureThumbForItem(m);
+      if(dataUrl && node && !node.getAttribute('src')) node.setAttribute('src', dataUrl);
+    }
+  });
+}" yet.</div>`:'<div class="empty">No media yet. Add some!</div>';
+    return;
+  }
+  videoListEl.innerHTML = items.map(m=>{
+    const progressHTML=`<div class="upload-progress"><div class="bar" style="width:0%"></div></div>`;
     const provisionalSrc = m.url || '';
     const thumb = m.type==='image'
       ? `<img data-src-id="${m.id}" ${provisionalSrc?`src="${provisionalSrc}"`:''} alt="${esc(m.name)}">`
@@ -445,12 +606,17 @@ async function openViewer(id){
   const url = await ensureObjectUrl(m);
   viewerVid.src = url || '';
   viewerTitleEl.textContent = m.name || 'Media';
+  const dlink = document.getElementById('viewerDownload');
+  if(dlink){ dlink.href = url || '#'; dlink.setAttribute('download', m.name || 'download'); }
   viewerEl.classList.add('show');
   resetViewerIdle(); viewerVid.focus();
 
   const playAttempt = viewerVid.play();
   if(playAttempt && typeof playAttempt.then==='function'){
     playAttempt.catch(()=>{ showRetry(); });
+  }
+  setTimeout(()=>{ if(viewerVid.currentTime===0) showRetry(); }, 1500);
+});
   }
   setTimeout(()=>{ if(viewerVid.currentTime===0) showRetry(); }, 2000);
 }
