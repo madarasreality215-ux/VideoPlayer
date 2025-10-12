@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MediaTracker Pro — Animated Login + Full Features</title>
+<meta name="theme-color" content="#0b1220" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220; --card:#0f1724; --ink:#e6eef9; --muted:rgba(230,238,249,.7);
+    --accent:#7c3aed; --accent2:#9f7aea; --success:#10b981; --danger:#ef4444;
+    --stroke:rgba(255,255,255,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  /* Flowing gradient waves background */
+  .bg-anim{position:fixed;inset:0;z-index:-1;overflow:hidden;}
+  .bg-anim::before,.bg-anim::after{content:"";position:absolute;width:160vmax;height:160vmax;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;filter:blur(70px);opacity:.45;}
+  .bg-anim::before{background:radial-gradient(circle at 30% 30%, var(--accent), transparent 60%), radial-gradient(circle at 70% 70%, var(--accent2), transparent 60%);animation:float1 22s ease-in-out infinite alternate;}
+  .bg-anim::after{background:radial-gradient(circle at 70% 30%, #0ea5e9, transparent 60%), radial-gradient(circle at 30% 70%, #22d3ee, transparent 60%);mix-blend-mode:screen;animation:float2 26s ease-in-out infinite alternate;}
+  @keyframes float1{from{transform:translate(-55%,-52%) rotate(0deg);}to{transform:translate(-45%,-48%) rotate(15deg);}}
+  @keyframes float2{from{transform:translate(-45%,-48%) rotate(0deg);}to{transform:translate(-55%,-52%) rotate(-12deg);}}
+  /* Header */
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--stroke);position:sticky;top:0;z-index:20}
+  header h1{font-size:18px;margin:0}
+  .nav{margin-left:auto;display:flex;gap:8px}
+  .btn,.ghost{border:none;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+  .btn{background:var(--accent);color:#fff}
+  .ghost{background:transparent;border:1px solid var(--stroke);color:var(--ink)}
+  .ghost#statsBtn{color:var(--accent);border-color:rgba(124,58,237,.35)}
+  .ghost#statsBtn:hover{background:var(--accent);color:#fff;box-shadow:0 0 14px var(--accent)}
+  /* Layout */
+  .wrap{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+  aside{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:12px;max-height:calc(100vh - 84px);overflow:auto}
+  main{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:12px;min-height:60vh}
+  h3{margin:10px 0 8px}
+  input[type="text"],input[type="search"],input[type="url"],input[type="email"],input[type="password"]{width:100%;padding:10px;border-radius:10px;background:transparent;border:1px solid var(--stroke);color:var(--ink)}
+  .drop{border:2px dashed var(--accent);border-radius:12px;padding:20px;text-align:center;color:var(--muted)}
+  .drop.drag{background:rgba(124,58,237,.12)}
+  /* Media grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .card{background:rgba(255,255,255,.02);border:1px solid var(--stroke);border-radius:12px;padding:8px}
+  .thumb{width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+  .thumb>img,.thumb>video{width:100%;height:100%;object-fit:cover}
+  .meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--muted)}
+  .controls{display:flex;gap:6px;margin-top:6px}
+  .controls button{font-size:12px;padding:6px 8px;border-radius:8px;border:1px solid var(--stroke);background:transparent;color:var(--ink);cursor:pointer}
+  .controls button:hover{background:rgba(255,255,255,.04)}
+  /* Progress */
+  .pbar{height:6px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin-top:6px}
+  .pfill{height:100%;width:0;background:var(--accent);transition:width .2s ease}
+  .pfill.done{background:var(--success);box-shadow:0 0 10px var(--success)}
+  /* Animated Login Overlay */
+  .auth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);z-index:50}
+  .card-auth{width:min(92vw,420px);background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:28px;box-shadow:0 10px 40px rgba(0,0,0,.35);animation:pop .6s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .title{font-size:22px;margin:0 0 6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent}
+  .subtitle{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .error{color:#f87171;margin-top:8px;display:none}
+</style>
+
+<style>
+/* === Oathbound Archives – Final Fixed (GitHub build) === */
+
+/* Dim mural background (responsive, ONLY the image is blurred) */
+.background-layer {
+  position: fixed;
+  inset: 0;
+  background: url("the_fool.jpg") center/cover no-repeat;
+  filter: brightness(0.35) contrast(1.05) blur(4px);
+  opacity: 0.45;
+  z-index: -3;
+}
+
+/* Centered visualizer (slightly blurred for soft glow) */
+#visualizer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -2;
+  display: block;
+  pointer-events: none;
+  opacity: 1;
+  filter: blur(1.2px);
+  transition: opacity .6s ease;
+}
+
+/* Solid stone-gray login card (crisp, no blur) */
+.card-auth {
+  background: #2a2a2e !important;
+  border: 1px solid rgba(200,200,210,0.20);
+  box-shadow:
+    0 0 20px rgba(255,255,255,0.05),
+    inset 0 0 12px rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 24px 30px;
+  position: relative;
+  z-index: 10;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Hover aura for inputs/buttons */
+.card-auth input, .card-auth button {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+  border-radius: 10px;
+}
+.card-auth input:hover, .card-auth input:focus, .card-auth button:hover {
+  box-shadow: 0 0 16px rgba(210,210,220,0.35), 0 0 2px rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+}
+
+/* Awaken overlay (warm parchment text, candle glow) */
+#awakenOverlay{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background: rgba(10,9,8,0.92);
+  z-index: 100000;
+  cursor: pointer;
+  opacity: 1; transition: opacity 900ms ease;
+}
+#awakenOverlay.hidden{ opacity:0; pointer-events:none; }
+#awakenOverlay .awaken-text{
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: #d9d2c2;
+  text-shadow:
+    0 0 6px rgba(255, 214, 140, 0.45),
+    0 0 18px rgba(255, 194, 100, 0.25),
+    0 0 36px rgba(255, 170, 60, 0.15);
+  padding: 18px 26px;
+  border: 1px solid rgba(200,190,170,0.25);
+  border-radius: 10px;
+  background: radial-gradient(ellipse at center, rgba(40,36,30,0.35), rgba(24,22,20,0.15) 60%, rgba(0,0,0,0));
+}
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+  .card-auth { padding: 18px 20px; border-radius: 12px; }
+  #awakenOverlay .awaken-text { font-size: 22px; padding: 14px 18px; }
+}
+</style>
+
+</head>
+<body>
+<div class="bg-anim"></div>
+
+<!-- Animated Login (first view) -->
+<div id="authScreen" class="auth">
+  <div class="card-auth">
+    <h2 class="title">📁 MediaTracker Pro</h2>
+    <p class="subtitle">Sign in to continue</p>
+    <form id="authForm">
+      <input id="authEmail" type="email" placeholder="Email" required />
+      <div style="height:8px"></div>
+      <input id="authPassword" type="password" placeholder="Password" required />
+      <div style="height:10px"></div>
+      <button id="loginBtn" class="btn" type="submit" style="width:100%;position:relative">
+        <span id="loginText">Sign In</span>
+        <span id="loginSpin" style="display:none;position:absolute;right:14px;top:50%;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;transform:translateY(-50%);
+        animation:spin 1s linear infinite"></span>
+      </button>
+      <div id="authError" class="error">Invalid credentials</div>
+    </form>
+  </div>
+</div>
+
+<header>
+  <h1>🏠 MediaTracker Pro</h1>
+  <div class="nav">
+    <a id="statsBtn" class="ghost" href="stats.html">📊 Stats</a>
+    <button id="signOutBtn" class="ghost">Sign Out</button>
+  </div>
+</header>
+
+<div id="appContainer" class="wrap" style="display:none">
+  <aside>
+    <h3>🏠 Main Library</h3>
+    <button id="syncNowBtn" class="btn" style="width:100%">🔄 Sync Now</button>
+
+    <h3 style="margin-top:14px">📂 Folders</h3>
+    <div style="display:flex;gap:6px">
+      <input id="newFolderName" type="text" placeholder="New folder name" />
+      <button id="addFolderBtn" class="btn">Add</button>
+    </div>
+    <div id="folderList" style="margin-top:8px"></div>
+
+    <h3 style="margin-top:16px">📤 Import Folder</h3>
+    <button id="importTriggerBtn" class="ghost" style="width:100%">Import Files</button>
+    <input id="importFileInput" type="file" multiple hidden>
+    <div id="dropZone" class="drop" style="margin-top:8px">Drag & Drop Files Here</div>
+    <div id="importPreview" class="subtitle" style="margin-top:8px">Choose files or drag them above.</div>
+
+    <h3 style="margin-top:16px">🌐 Twitter Downloader</h3>
+    <input id="tweetUrl" type="url" placeholder="Paste tweet link..." />
+    <button id="fetchTweetBtn" class="btn" style="margin-top:6px;width:100%">🔍 Fetch Media</button>
+    <div id="tweetPreview" class="subtitle" style="margin-top:8px">Paste a tweet link to preview media.</div>
+    <div id="tweetMediaPreview" style="margin-top:8px;display:grid;gap:8px"></div>
+  </aside>
+
+  <main>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="searchInput" type="search" placeholder="🔎 Search..." />
+      <button id="sortBtn" class="ghost">Sort</button>
+    </div>
+
+    <div id="mediaGrid" class="grid" style="margin-top:12px"></div>
+
+    <div id="viewer" style="display:none;margin-top:12px">
+      <video id="popupVideo" controls playsinline style="width:100%;max-height:70vh;background:#000;border-radius:12px"></video>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+<script>
+  // ===== Firebase Init (your original project kept) =====
+  const firebaseConfig={
+    apiKey:"AIzaSyBH691ymS0uO7JejXC1MGFuhiIElD78UPY",
+    authDomain:"personalplayer-c8d3b.firebaseapp.com",
+    projectId:"personalplayer-c8d3b",
+    storageBucket:"personalplayer-c8d3b.appspot.com",
+    messagingSenderId:"396785312809",
+    appId:"1:396785312809:web:02290950ec22a13165a838"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth=firebase.auth();
+  const db=firebase.firestore();
+  const storage=firebase.storage();
+
+  // ===== Auth Workflow (Animated login first) =====
+  const authScreen=document.getElementById('authScreen');
+  const authForm=document.getElementById('authForm');
+  const authEmail=document.getElementById('authEmail');
+  const authPassword=document.getElementById('authPassword');
+  const authError=document.getElementById('authError');
+  const loginBtn=document.getElementById('loginBtn');
+  const loginText=document.getElementById('loginText');
+  const loginSpin=document.getElementById('loginSpin');
+  const appContainer=document.getElementById('appContainer');
+  const signOutBtn=document.getElementById('signOutBtn');
+
+  auth.onAuthStateChanged(async (u)=>{
+    if(u){
+      authScreen.style.display='none';
+      appContainer.style.display='grid';
+      await loadVideos();
+    }else{
+      appContainer.style.display='none';
+      authScreen.style.display='flex';
+      loginSpin.style.display='none';
+      loginBtn.disabled=false; loginText.textContent='Sign In';
+    }
+  });
+
+  authForm.addEventListener('submit', async (e)=>{
+    e.preventDefault(); authError.style.display='none';
+    loginBtn.disabled=true; loginText.textContent='Signing in…'; loginSpin.style.display='inline-block';
+    try{await auth.signInWithEmailAndPassword(authEmail.value,authPassword.value);}catch(err){
+      authError.textContent=err.message||'Login failed'; authError.style.display='block';
+      loginBtn.disabled=false; loginSpin.style.display='none'; loginText.textContent='Sign In';
+    }
+  });
+  signOutBtn.onclick=()=>auth.signOut();
+
+  // ===== Elements for features =====
+  const mediaGrid=document.getElementById('mediaGrid');
+  const popupVideo=document.getElementById('popupVideo');
+  const viewer=document.getElementById('viewer');
+  const importTriggerBtn=document.getElementById('importTriggerBtn');
+  const importFileInput=document.getElementById('importFileInput');
+  const dropZone=document.getElementById('dropZone');
+  const importPreview=document.getElementById('importPreview');
+  const syncNowBtn=document.getElementById('syncNowBtn');
+  const tweetUrl=document.getElementById('tweetUrl');
+  const fetchTweetBtn=document.getElementById('fetchTweetBtn');
+  const tweetPreview=document.getElementById('tweetPreview');
+  const tweetMediaPreview=document.getElementById('tweetMediaPreview');
+
+  // ===== Helpers =====
+  function cardEl(data,id){
+    const el=document.createElement('div'); el.className='card';
+    const t=document.createElement('div'); t.className='thumb';
+    if(data.type==='photo'){const img=document.createElement('img'); img.src=data.url; t.appendChild(img);} else {const vid=document.createElement('video'); vid.src=data.url; if(data.thumbUrl) vid.poster=data.thumbUrl; vid.muted=true; t.appendChild(vid);} 
+    el.appendChild(t);
+    const meta=document.createElement('div'); meta.className='meta'; meta.innerHTML=`<span title="${data.name}">${data.name}</span><span>${(data.size||0)/1e6>=1?((data.size/1e6).toFixed(1)+' MB'):''}</span>`; el.appendChild(meta);
+    const ctr=document.createElement('div'); ctr.className='controls';
+    ctr.innerHTML=`<button onclick="renameMedia('${id}','${data.name.replace(/'/g,"&#39;")}')">✏️ Rename</button><button onclick="deleteMedia('${id}')">🗑️ Delete</button>`; el.appendChild(ctr);
+    el.onclick=(e)=>{if(e.target.tagName==='BUTTON')return; openViewer(data.url)};
+    return el;
+  }
+  function openViewer(url){popupVideo.src=url; viewer.style.display='block'; popupVideo.play();}
+  document.addEventListener('click',(e)=>{if(!e.target.closest('#viewer')&&!e.target.closest('.card')){popupVideo.pause();popupVideo.src='';viewer.style.display='none';}});
+
+  // ===== Upload & List =====
+  async function uploadFile(file,type,opts={}){
+    const id='f_'+Date.now()+Math.random().toString(16).slice(2);
+    const path=`media/${id}_${file.name}`;
+    const ref=storage.ref(path);
+    const snap=await ref.put(file);
+    const url=await ref.getDownloadURL();
+    const doc={name:file.name,url,type,size:file.size,createdAt:firebase.firestore.FieldValue.serverTimestamp(),path};
+    if(opts.thumbUrl) doc.thumbUrl=opts.thumbUrl;
+    await db.collection('videos').doc(id).set(doc);
+    return {id,url,doc};
+  }
+
+  async function loadVideos(){
+    mediaGrid.innerHTML='';
+    const snap=await db.collection('videos').orderBy('createdAt','desc').get();
+    snap.forEach(d=>{const data=d.data(); mediaGrid.appendChild(cardEl(data,d.id));});
+  }
+
+  // ===== Drag & Drop / Import (preview first, then upload) =====
+  importTriggerBtn.onclick=()=>importFileInput.click();
+  importFileInput.onchange=(e)=>handleDropFiles(e.target.files);
+  ;['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,(e)=>{e.preventDefault(); dropZone.classList.add('drag');}));
+  ;['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,(e)=>{e.preventDefault(); dropZone.classList.remove('drag');}));
+  dropZone.addEventListener('drop',(e)=>handleDropFiles(e.dataTransfer.files));
+
+  async function handleDropFiles(fileList){
+    const files=[...fileList]; if(!files.length) return; importPreview.textContent=`Uploading ${files.length} file(s)...`;
+    for(const file of files){ await displayThenUpload(file); }
+    importPreview.textContent='Upload complete.'; await loadVideos();
+  }
+
+  async function displayThenUpload(file){
+    // show card immediately with local preview
+    const tempId='temp_'+Date.now();
+    const el=document.createElement('div'); el.className='card';
+    const t=document.createElement('div'); t.className='thumb';
+    const isVideo=file.type.startsWith('video/');
+    if(isVideo){const v=document.createElement('video'); v.src=URL.createObjectURL(file); v.controls=false; v.muted=true; t.appendChild(v);} else {const img=document.createElement('img'); img.src=URL.createObjectURL(file); t.appendChild(img);} 
+    el.appendChild(t); const pb=document.createElement('div'); pb.className='pbar'; pb.innerHTML='<div class="pfill"></div>'; el.appendChild(pb); mediaGrid.prepend(el);
+
+    let thumbUrl=undefined;
+    if(isVideo){ // create custom thumbnail (1s frame)
+      thumbUrl=await captureThumb(file).catch(()=>undefined);
+    }
+    // upload (no progress API here; relies on pfill to turn green once done)
+    const pfill=pb.querySelector('.pfill');
+    const {doc}=await uploadFile(file,isVideo?'video':'photo',{thumbUrl});
+    pfill.style.width='100%'; pfill.classList.add('done');
+  }
+
+  function captureThumb(file){
+    return new Promise((resolve,reject)=>{
+      const v=document.createElement('video'); v.src=URL.createObjectURL(file); v.muted=true; v.currentTime=1;
+      v.onloadeddata=()=>{
+        const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+        c.toBlob(async (blob)=>{
+          if(!blob) return reject();
+          const name=file.name.replace(/\.[^/.]+$/, '')+'_thumb.jpg';
+          const {doc}=await uploadFile(new File([blob],name,{type:'image/jpeg'}),'photo');
+          resolve(doc.url);
+        },'image/jpeg',0.85);
+      };
+      v.onerror=()=>reject();
+    });
+  }
+
+  // ===== Rename / Delete =====
+  window.renameMedia=async (id,oldName)=>{
+    const nn=prompt('New name:', oldName); if(!nn||nn===oldName) return;
+    await db.collection('videos').doc(id).update({name:nn}); await loadVideos();
+  }
+  window.deleteMedia=async (id)=>{
+    if(!confirm('Delete this item?')) return;
+    const docRef=db.collection('videos').doc(id); const d=await docRef.get(); const data=d.data();
+    if(data&&data.path){ await storage.ref(data.path).delete().catch(()=>{}); }
+    await docRef.delete(); await loadVideos();
+  }
+
+  // ===== Sync =====
+  syncNowBtn.onclick=()=>loadVideos();
+
+  // ===== FixTweet Downloader (preview -> upload; tweetID-named; show immediately) =====
+  fetchTweetBtn.onclick=async ()=>{
+    const url=(tweetUrl.value||'').trim(); if(!url) return alert('Enter a tweet URL');
+    tweetPreview.textContent='Fetching from FixTweet…'; tweetMediaPreview.innerHTML='';
+    try{
+      const idMatch=url.match(/status\/(\d+)/); const tid=idMatch? idMatch[1] : url.split('/').pop();
+      const res=await fetch(`https://api.fxtwitter.com/${encodeURIComponent(tid)}`);
+      const data=await res.json();
+      if(!data||!data.tweet){ tweetPreview.textContent='No tweet data.'; return; }
+      const medias=(data.tweet.media?.videos||[]).map(v=>({type:'video',url:v.url,preview_url:v.thumbnail_url||v.url}))
+        .concat((data.tweet.media?.photos||[]).map(p=>({type:'photo',url:p.url,preview_url:p.url})));
+      if(!medias.length){ tweetPreview.textContent='No media found in this tweet.'; return; }
+      tweetPreview.textContent=`Found ${medias.length} media file(s) by @${data.tweet.author?.screen_name||'unknown'}`;
+      for(let i=0;i<medias.length;i++){
+        const m=medias[i];
+        const wrap=document.createElement('div'); wrap.className='card';
+        const th=document.createElement('div'); th.className='thumb';
+        if(m.type==='video'){const v=document.createElement('video'); v.src=m.preview_url; v.controls=true; th.appendChild(v);} else {const img=document.createElement('img'); img.src=m.preview_url; th.appendChild(img);} wrap.appendChild(th);
+        const b=document.createElement('button'); b.className='btn'; b.style.marginTop='6px'; b.textContent='📥 Upload to Firebase';
+        b.onclick=async ()=>{
+          const blob=await (await fetch(m.url)).blob();
+          const ext=m.type==='video'?'.mp4':'.jpg'; const fname=`tweet_${tid}_${i}${ext}`;
+          // show in grid immediately
+          await displayThenUpload(new File([blob], fname, {type: blob.type})); await loadVideos();
+        };
+        wrap.appendChild(b); tweetMediaPreview.appendChild(wrap);
+      }
+    }catch(e){ console.error(e); tweetPreview.textContent='Error fetching tweet media.'; }
+  }
+
+  // minor
+  function $(q){return document.querySelector(q)}
+</script>
+
+<!-- === Cinematic Visualizer (Steel & Smoke, Login-Only Audio, Fallbacks) === -->
+<canvas id="visualizer"></canvas>
+<script>
+const canvas = document.getElementById("visualizer");
+const ctx = canvas.getContext("2d");
+function fitCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+fitCanvas(); window.addEventListener("resize", fitCanvas);
+
+// Media paths
+const IMAGE_SRC = "the_fool.jpg";
+const AUDIO_SRC = "golden_brown_vibes.mp3";
+
+// Fallback guards
+let imageOk = false;
+let audioOk = true;
+
+// Test image
+(function testImage(){
+  const img = new Image();
+  img.onload = ()=>{ imageOk = true; };
+  img.onerror = ()=>{
+    imageOk = false;
+    const bg = document.querySelector('.background-layer');
+    if (bg){
+      bg.style.background = 'linear-gradient(#1a1a1d, #2b2b30)';
+      bg.style.filter = 'none';
+      bg.style.opacity = '1';
+    }
+  };
+  img.src = IMAGE_SRC;
+})();
+
+// Init background
+(function initBackground(){
+  const bg = document.querySelector('.background-layer');
+  if (bg){
+    bg.style.background = 'url("'+IMAGE_SRC+'") center/cover no-repeat';
+    bg.style.filter = 'brightness(0.35) contrast(1.05) blur(4px)';
+    bg.style.opacity = '0.45';
+  }
+})();
+
+// Audio
+const audio = new Audio(AUDIO_SRC);
+audio.loop = true;
+audio.crossOrigin = "anonymous";
+audio.volume = 0;
+audio.addEventListener('error', ()=>{ audioOk = false; });
+
+let audioCtx;
+try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioOk = false; }
+let analyser, dataArray, source;
+if (audioCtx){
+  try{
+    source = audioCtx.createMediaElementSource(audio);
+    analyser = new AnalyserNode(audioCtx, { fftSize: 1024 });
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+  }catch(e){ audioOk = false; }
+}
+
+// State
+let running=false, targetVolume=0.75, fadeInt=null;
+function fadeAudio(toVol, dur=1500){
+  if(!audioOk) return;
+  clearInterval(fadeInt);
+  const steps=30, dt=dur/steps, diff=toVol-audio.volume;
+  let i=0; fadeInt=setInterval(()=>{
+    i++; audio.volume += diff/steps;
+    if(i>=steps){ audio.volume = toVol; clearInterval(fadeInt); if(toVol===0){ try{ audio.pause(); }catch(_){ } } }
+  }, dt);
+}
+
+// Particles
+class Particle{ constructor(x,y,s,c,d){ this.x=x; this.y=y; this.size=s; this.color=c; this.depth=d; this.alpha=1; this.sy=Math.random()*-1.2-0.3; }
+  update(){ this.y+=this.sy; this.x+=Math.sin(this.y*0.01)*this.depth*0.25; this.alpha-=0.015; }
+  draw(){ ctx.globalAlpha=this.alpha; ctx.fillStyle=this.color; ctx.shadowBlur=8; ctx.shadowColor=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; } }
+const particles=[];
+function spawnParticles(energy){ const mobile=canvas.width<600; const base=energy>150?(mobile?2:4):energy>110?(mobile?1:2):1;
+  for(let i=0;i<base;i++){ const x=Math.random()*canvas.width, y=canvas.height*0.45+Math.sin(Math.random()*Math.PI)*40;
+    const s=Math.random()*3+1.2, d=Math.random()*1.5+0.5; const c=Math.random()<0.6?'rgba(220,220,220,0.9)':'rgba(180,180,180,0.85)';
+    particles.push(new Particle(x,y,s,c,d)); } }
+
+// Runes & spirits
+const runes=['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᚲ','ᚷ','ᚺ','ᚾ','ᛁ','ᛃ','ᛇ','ᛈ','ᛉ','ᛊ','ᛏ','ᛒ','ᛗ','ᛚ','ᛜ','ᛟ','ᛞ'];
+const runeSigils=Array.from({length:8}).map((_,i)=>({ angle:(Math.PI*2/8)*i, radius:110+Math.random()*28, rot:(Math.random()*0.5+0.15)*(Math.random()<0.5?-1:1), glyph:runes[Math.floor(Math.random()*runes.length)] }));
+function drawRunes(t){ const authCard=document.querySelector('.card-auth'); if(!authCard) return;
+  const rect=authCard.getBoundingClientRect(), cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  ctx.save(); ctx.font='18px Georgia'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const s of runeSigils){ const a=s.angle+t*0.004*s.rot, x=cx+Math.cos(a)*s.radius, y=cy+Math.sin(a)*s.radius; const alpha=0.18+0.2*Math.sin(t*0.018+s.angle);
+    ctx.globalAlpha=alpha; ctx.fillStyle='rgba(230,230,230,0.95)'; ctx.fillText(s.glyph,x,y); } ctx.restore(); ctx.globalAlpha=1; }
+
+class Spirit{ constructor(){ const w=canvas.width,h=canvas.height; this.p0={x:-60,y:Math.random()*h*0.8+h*0.1}; this.p1={x:Math.random()*w*0.5,y:Math.random()*h};
+  this.p2={x:Math.random()*w*0.5+w*0.5,y:Math.random()*h}; this.p3={x:w+60,y:Math.random()*h*0.8+h*0.1}; this.t=0; this.speed=0.002+Math.random()*0.0025;
+  this.size=3+Math.random()*3; this.color='rgba(235,235,235,0.7)'; } step(){ this.t+=this.speed; if(this.t>1) this.t=1; }
+  pos(){ const t=this.t,mt=1-t; return { x:mt*mt*mt*this.p0.x+3*mt*mt*t*this.p1.x+3*mt*t*t*this.p2.x+t*t*t*this.p3.x,
+    y:mt*mt*mt	this.p0.y+3*mt*mt*t	this.p1.y+3*mt*t*t	this.p2.y+t*t*t	this.p3.y }; }
+  draw(){ const p=this.pos(); ctx.save(); ctx.globalAlpha=0.6*(1-Math.abs(this.t-0.5)*1.5); ctx.fillStyle=this.color; ctx.shadowBlur=16; ctx.shadowColor=this.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,this.size,0,Math.PI*2); ctx.fill(); ctx.restore(); } }
+let spirits=[], spiritCooldown=0;
+
+// Cursor
+let cursor={x:window.innerWidth/2,y:window.innerHeight/2,active:false};
+window.addEventListener('mousemove',e=>{cursor.x=e.clientX;cursor.y=e.clientY;cursor.active=true;});
+window.addEventListener('mouseleave',()=>{cursor.active=false;});
+
+// Medieval labels
+document.addEventListener('DOMContentLoaded', ()=>{
+  const title=document.querySelector('.card-auth h1, .card-auth .title'); if(title) title.textContent='Oathbound Archives';
+  const sub=document.querySelector('.card-auth .subtitle, .card-auth p.subtitle, .card-auth small'); if(sub) sub.textContent='Enter the Royal Gateway';
+  const emailLbl=document.querySelector('label[for="email"], .card-auth label.email'); if(emailLbl) emailLbl.textContent='Scroll of Identity';
+  const passLbl=document.querySelector('label[for="password"], .card-auth label.password'); if(passLbl) passLbl.textContent='Sigil Key';
+  const emailInput=document.querySelector('input[type="email"], #email'); if(emailInput && !emailInput.placeholder) emailInput.placeholder='Scroll of Identity';
+  const passInput=document.querySelector('input[type="password"], #password'); if(passInput && !passInput.placeholder) passInput.placeholder='Sigil Key';
+  const btn=document.querySelector('.card-auth button[type="submit"], .card-auth .btn-primary, .card-auth button'); if(btn) btn.textContent='Swear Thy Oath';
+});
+
+// Background painter
+function paintBackground(){
+  const g=ctx.createLinearGradient(0,0,0,canvas.height); g.addColorStop(0,'#1a1a1d'); g.addColorStop(1,'#2b2b30');
+  ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const r=ctx.createRadialGradient(canvas.width*.5,canvas.height*.35,50,canvas.width*.5,canvas.height*.35,Math.max(canvas.width,canvas.height)*.7);
+  r.addColorStop(0,'rgba(255,255,255,0.06)'); r.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=r; ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+// Waves
+function drawSteelWave(energy,t,layer=1){
+  const mid=canvas.height/2, amp=30+(energy/255)*55*layer, wl=160/layer, sp=0.012;
+  const grad=ctx.createLinearGradient(0,0,canvas.width,0); grad.addColorStop(0,'#888'); grad.addColorStop(0.5,'#bcbcbc'); grad.addColorStop(1,'#d9d9d9');
+  ctx.lineWidth=2.4/layer; ctx.strokeStyle=grad; ctx.shadowBlur=20/layer; ctx.shadowColor='#cfcfcf';
+  ctx.beginPath(); for(let x=0;x<canvas.width;x+=6){ const y=mid+Math.sin(x/wl+t*sp*layer)*amp*0.8; ctx.lineTo(x,y); } ctx.stroke();
+}
+
+// Loop
+let tick=0;
+function animate(){
+  if(!running) return; requestAnimationFrame(animate);
+  let energy=0; if(analyser&&dataArray){ analyser.getByteFrequencyData(dataArray); energy=dataArray.reduce((a,b)=>a+b,0)/dataArray.length; }
+  paintBackground(); drawSteelWave(energy,tick,1.0); drawSteelWave(energy,tick,1.3);
+  spawnParticles(energy); for(const p of particles){ p.update(); p.draw(); } for(let i=particles.length-1;i>=0;i--) if(particles[i].alpha<=0) particles.splice(i,1);
+  if(cursor.active){ for(const p of particles){ const dx=cursor.x-p.x, dy=cursor.y-p.y, d2=dx*dx+dy*dy; if(d2<120*120){ p.x+=dx*0.003; p.y+=dy*0.003; } }
+    if(Math.random()<0.25) particles.push(new Particle(cursor.x,cursor.y,Math.random()*2+1,'rgba(210,210,210,0.9)',1)); }
+  if(spiritCooldown<=0 && Math.random()<0.01){ spirits.push(new Spirit()); spiritCooldown=600; } else { spiritCooldown--; }
+  for(let i=spirits.length-1;i>=0;i--){ const s=spirits[i]; s.step(); s.draw(); if(s.t>=1) spirits.splice(i,1); }
+  drawRunes(tick); tick++;
+}
+
+// Control
+function showVisualizer(){ running=true; canvas.style.opacity='1'; animate(); }
+function hideVisualizer(){ running=false; canvas.style.opacity='0'; fadeAudio(0,1500); }
+
+function showOathAccepted(){ const el=document.getElementById('oathAcceptedOverlay'); if(!el) return; el.style.display='flex'; setTimeout(()=>{el.style.display='none';},1500); }
+
+const awakenEl=document.getElementById('awakenOverlay');
+if(awakenEl){
+  awakenEl.addEventListener('click', async ()=>{
+    awakenEl.classList.add('hidden');
+    try{ if(audioOk && audioCtx){ await audioCtx.resume(); await audio.play(); fadeAudio(targetVolume,1500); } }catch(e){}
+    showVisualizer();
+  });
+}
+
+// Firebase listener
+if(window.firebase && firebase.auth){
+  firebase.auth().onAuthStateChanged(u=>{
+    const bg=document.querySelector('.background-layer');
+    if(u){
+      if(bg){ bg.style.background='#0B1220'; bg.style.filter='none'; bg.style.opacity='1'; }
+      fadeAudio(0,1500); hideVisualizer(); showOathAccepted();
+    }else{
+      if(bg){
+        if(imageOk){ bg.style.background='url("'+IMAGE_SRC+'") center/cover no-repeat'; bg.style.filter='brightness(0.35) contrast(1.05) blur(4px)'; bg.style.opacity='0.45'; }
+        else { bg.style.background='linear-gradient(#1a1a1d, #2b2b30)'; bg.style.filter='none'; bg.style.opacity='1'; }
+      }
+      if(awakenEl) awakenEl.classList.remove('hidden');
+    }
+  });
+}
+</script>
+<!-- === End Visualizer === -->
+
+</body>
+</html>
