@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📱 MediaTracker Pro — Full Edition (FixTweet v2 + Smart Rename)</title>
+<meta name="theme-color" content="#7c3aed">
+<style>
+  :root{--bg:#0b1220;--card:#0f1724;--text:#e6eef9;--muted:rgba(230,238,249,0.65);--accent:#7c3aed;--accent-hover:#6d28d9;--card-border:rgba(255,255,255,0.08);--card-shadow:0 10px 25px rgba(0,0,0,0.28);--radius:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);padding:12px 16px;border-bottom:1px solid var(--card-border)}
+  h1{margin:0;font-size:18px;font-weight:700}
+  .container{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px}
+  @media(max-width:1024px){.container{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:14px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;transition:.25s}
+  .btn:hover{background:var(--accent-hover)}
+  .input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:transparent;color:var(--text)}
+  .small{font-size:12px;color:var(--muted)}
+  .vitem{width:260px;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px;margin:8px;transition:.2s}
+  .vitem:hover{background:rgba(255,255,255,0.06)}
+  .thumb video,.thumb img{width:100%;height:150px;object-fit:cover;border-radius:8px}
+  .meta h4{margin:0;font-size:14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item-actions{display:flex;justify-content:center;gap:8px;margin-top:6px}
+  .item-btn{background:transparent;border:1px solid var(--card-border);border-radius:8px;color:var(--text);cursor:pointer;padding:4px 8px;font-size:12px;transition:.25s}
+  .item-btn:hover{background:rgba(255,255,255,0.08)}
+  input.rename-input{width:90%;margin:4px auto;display:block;padding:6px;border-radius:6px;border:1px solid var(--card-border);background:var(--bg);color:var(--text);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>📱 MediaTracker Pro (FixTweet v2 + Smart Rename)</h1></header>
+<div class="container">
+<div class="sidebar">
+  <div class="card">
+    <h3>🐦 Twitter/X Downloader</h3>
+    <input id="tweetUrl" class="input" placeholder="Paste Twitter/X URL here">
+    <button id="fetchTweet" class="btn" style="width:100%;margin-top:8px">Fetch Twitter Media</button>
+    <div id="tweetPreview" class="card" style="margin-top:10px;display:none;padding:10px">
+      <h3 style="margin-bottom:8px">🎞️ Preview</h3>
+      <div id="tweetMediaBox" style="text-align:center"></div>
+      <select id="qualitySelect" style="display:none;width:100%;margin-top:8px;"></select>
+      <button id="saveFromTweet" class="btn" style="width:100%;margin-top:10px;display:none">⬇️ Download to Library</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar"><div class="search"><input id="search" placeholder="🔍 Search videos..."></div></div>
+  <div id="mainEmpty" class="small" style="text-align:center;margin-top:40px;">No media yet. Add some videos or photos to get started!</div>
+  <div id="mainList" style="display:flex;flex-wrap:wrap;gap:12px;"></div>
+</div>
+</div>
+
+<script>
+const LS_KEY='mtp_meta_v5_allfeatures';
+const DB_NAME='mtp_media_db', DB_STORE='media';
+let state={media:{}};
+const uid=p=>p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+const save=()=>localStorage.setItem(LS_KEY,JSON.stringify(state));
+const load=()=>{try{Object.assign(state,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}};load();
+
+async function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=e=>e.target.result.createObjectStore(DB_STORE);r.onerror=rej;r.onsuccess=e=>res(e.target.result)});}
+async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(blob,id);return new Promise(r=>tx.oncomplete=r)}
+async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}
+
+const tweetUrl=document.getElementById('tweetUrl'),fetchTweet=document.getElementById('fetchTweet'),tweetPreview=document.getElementById('tweetPreview'),tweetMediaBox=document.getElementById('tweetMediaBox'),qualitySelect=document.getElementById('qualitySelect'),saveFromTweet=document.getElementById('saveFromTweet');
+let tweetFetched={type:null,name:null,blob:null,variants:[],defaultUrl:null};
+
+fetchTweet.onclick=async()=>{
+  const url=(tweetUrl.value||'').trim();if(!url){alert('Please enter a valid Twitter/X URL');return;}
+  tweetPreview.style.display='block';tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';
+  try{
+    const m=url.match(/(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([^\/]+)\/status\/(\d+)/i);if(!m){tweetMediaBox.innerHTML='<div class="small">⚠️ Invalid URL.</div>';return;}
+    const username=m[1],tweetId=m[2];const res=await fetch(`https://api.vxtwitter.com/${username}/status/${tweetId}`);if(!res.ok)throw 0;const data=await res.json();
+    tweetMediaBox.innerHTML='';tweetFetched={type:null,name:null,blob:null,variants:[],defaultUrl:null};
+    let v=null,img=null,variants=[];
+    if(data?.media?.all){const vids=data.media.all.find(x=>x.type==='video');if(vids&&Array.isArray(vids.variants)){variants=vids.variants.filter(x=>x.url);variants.sort((a,b)=>(b.bitrate||0)-(a.bitrate||0));v=(variants[0]||{}).url||null;}}
+    if(!v&&Array.isArray(data?.media)){for(const x of data.media){if(!v&&(x.type==='video'||x.type==='animated_gif')&&x.url)v=x.url;if(!img&&x.type==='photo'&&x.url)img=x.url;}}
+    if(!v&&Array.isArray(data?.mediaURLs))v=data.mediaURLs[0];if(!img&&Array.isArray(data?.mediaURLs)&&!v)img=data.mediaURLs[0];
+    if(v){const vr=document.createElement('video');vr.src=v;vr.controls=true;vr.autoplay=true;vr.muted=true;tweetMediaBox.appendChild(vr);tweetFetched.type='video';tweetFetched.name=`tweet_${tweetId}.mp4`;tweetFetched.defaultUrl=v;tweetFetched.variants=variants.length?variants:[{url:v}];
+      if(variants.length>1){qualitySelect.innerHTML='';variants.forEach((x,i)=>{const label=x.bitrate>=2e6?'HD':x.bitrate>=1e6?'SD':'Low';const opt=document.createElement('option');opt.value=x.url;opt.textContent=`${label} (${Math.round((x.bitrate||0)/1000)} kbps)`;if(i===0)opt.selected=true;qualitySelect.appendChild(opt);});qualitySelect.style.display='block';}
+      saveFromTweet.style.display='inline-block';}
+    else if(img){const ir=new Image();ir.src=img;tweetMediaBox.appendChild(ir);tweetFetched.type='photo';tweetFetched.name=`tweet_${tweetId}.jpg`;tweetFetched.blob=await(await fetch(img)).blob();saveFromTweet.style.display='inline-block';}
+    else tweetMediaBox.innerHTML='<div class="small">⚠️ No media found.</div>';
+  }catch(e){tweetMediaBox.innerHTML='<div class="small">⚠️ Failed to fetch media.</div>';}
+};
+
+saveFromTweet.onclick=async()=>{
+  if(!tweetFetched.type)return;
+  if(tweetFetched.type==='video'){const chosen=(qualitySelect.style.display!=='none'&&qualitySelect.value)?qualitySelect.value:tweetFetched.defaultUrl;const blob=await(await fetch(chosen)).blob();const id=uid('vid');await dbPut(id,blob);state.media[id]={id,name:tweetFetched.name,type:'video',dbKey:id,createdAt:Date.now()};}
+  else if(tweetFetched.type==='photo'){if(!tweetFetched.blob)return;const id=uid('img');await dbPut(id,tweetFetched.blob);state.media[id]={id,name:tweetFetched.name,type:'photo',dbKey:id,createdAt:Date.now()};}
+  save();renderMain();tweetPreview.style.display='none';tweetUrl.value='';
+};
+
+async function renderMain(){const list=document.getElementById('mainList');list.innerHTML='';const all=Object.values(state.media||{});if(!all.length){document.getElementById('mainEmpty').style.display='block';return;}document.getElementById('mainEmpty').style.display='none';for(const m of all){list.appendChild(await renderItem(m));}}
+async function renderItem(m){const el=document.createElement('div');el.className='vitem';const th=document.createElement('div');th.className='thumb';const blob=await dbGet(m.dbKey);if(blob){const url=URL.createObjectURL(blob);if(m.type==='photo'){const i=new Image();i.src=url;th.appendChild(i);}else{const v=document.createElement('video');v.src=url;v.muted=true;v.playsInline=true;th.appendChild(v);}}else th.textContent='(missing)';
+  const meta=document.createElement('div');meta.className='meta';const h=document.createElement('h4');h.textContent=m.name||'(untitled)';meta.appendChild(h);
+  const actions=document.createElement('div');actions.className='item-actions';
+  const rename=document.createElement('button');rename.className='item-btn';rename.textContent='✏️ Rename';rename.onclick=()=>{startRename(h,m);};
+  const del=document.createElement('button');del.className='item-btn';del.textContent='🗑️ Delete';del.onclick=async()=>{delete state.media[m.id];const db=await openDB();db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).delete(m.dbKey);save();renderMain();};
+  actions.append(rename,del);el.append(th,meta,actions);return el;}
+function startRename(h,m){const input=document.createElement('input');input.className='rename-input';input.value=m.name;h.replaceWith(input);input.focus();const dot=m.name.lastIndexOf('.');if(dot>0){input.setSelectionRange(0,dot);}else{input.select();}
+  input.addEventListener('blur',()=>saveRename(input,m));input.addEventListener('keydown',e=>{if(e.key==='Enter')saveRename(input,m);if(e.key==='Escape'){input.replaceWith(h);}});}
+function saveRename(input,m){m.name=input.value.trim()||m.name;save();renderMain();}
+renderMain();
+</script>
+</body>
+</html>
