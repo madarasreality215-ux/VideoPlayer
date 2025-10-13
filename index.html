@@ -54,82 +54,56 @@
   .viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9999;opacity:0;transition:opacity .25s ease}
   .viewer.show{display:flex;opacity:1}
 
+  /* --- Folder Button Size and Visibility Tweaks (Fixed) --- */
+  .folder-actions button {
+    font-size: 11px !important;
+    padding: 1px 5px !important;
+    margin-left: 3px !important;
+  }
+  .folder-actions { display: none; }
+  .folder-section.active .folder-actions { display: inline-flex; }
+  .folder-section.active { background: rgba(255,255,255,0.05); border-radius: 6px; }
 
-/* --- Folder Button Size and Visibility Tweaks (Fixed) --- */
-.folder-actions button {
-  font-size: 11px !important;
-  padding: 1px 5px !important;
-  margin-left: 3px !important;
-}
-.folder-actions {
-  display: none;
-}
-.folder-section.active .folder-actions {
-  display: inline-flex;
-}
-.folder-section.active {
-  background: rgba(255,255,255,0.05);
-  border-radius: 6px;
-}
+  .folder-actions button {
+    font-size: 11px !important;
+    padding: 1px 5px !important;
+    margin-left: 3px !important;
+  }
+  .folder-actions { display: none; }
+  .folder.active .folder-actions { display: inline-flex; }
+  .folder.active { background: rgba(255,255,255,0.05); border-radius: 6px; }
 
-.folder-actions button {
-  font-size: 11px !important;
-  padding: 1px 5px !important;
-  margin-left: 3px !important;
-}
-.folder-actions {
-  display: none;
-}
-.folder.active .folder-actions {
-  display: inline-flex;
-}
-.folder.active {
-  background: rgba(255,255,255,0.05);
-  border-radius: 6px;
-}
+  /* --- Center All Video Players and Viewer --- */
+  video { display: block; margin: 0 auto; }
+  .viewer-inner { display: flex; align-items: center; justify-content: center; height: 100%; }
 
-
-/* --- Center All Video Players and Viewer --- */
-video {
-  display: block;
-  margin: 0 auto;
-}
-.viewer-inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-
-/* --- Viewer absolute centering fixes --- */
-.viewer { display: none; align-items: center; justify-content: center; }
-.viewer.show { display: flex; }
-.viewer-inner { 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center; 
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  padding: 0 12px;
-}
-#viewer .viewer-topbar {
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 auto 12px !important;
-}
-#viewerVideo {
-  display: block;
-  margin: 0 auto;
-  max-width: 92vw;
-  max-height: 84vh;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.45);
-  background: #000;
-}
-
+  /* --- Viewer absolute centering fixes --- */
+  .viewer { display: none; align-items: center; justify-content: center; }
+  .viewer.show { display: flex; }
+  .viewer-inner { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    width: 100%;
+    height: 100%;
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+  #viewer .viewer-topbar {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto 12px !important;
+  }
+  #viewerVideo {
+    display: block;
+    margin: 0 auto;
+    max-width: 92vw;
+    max-height: 84vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+    background: #000;
+  }
 </style>
 </head>
 <body>
@@ -402,7 +376,6 @@ const tweetMediaBox=document.getElementById('tweetMediaBox');
 const saveFromTweet=document.getElementById('saveFromTweet');
 let tweetFetched={type:null,name:null,blob:null};
 
-
 fetchTweet.onclick=async()=>{
   const url=(tweetUrl.value||'').trim();
   if(!url){ alert('Please enter a valid Twitter/X URL'); return; }
@@ -427,8 +400,17 @@ fetchTweet.onclick=async()=>{
     tweetMediaBox.innerHTML='';
     tweetFetched={type:null,name:null,blob:null};
 
-    const v = data?.media?.videos?.[0]?.url;
-    const img = data?.media?.photos?.[0];
+    // --- Enhanced media detection (Option 2): handle videos, animated GIFs, and photos robustly ---
+    let v=null, img=null;
+    if (data?.media && Array.isArray(data.media)) {
+      for (const m of data.media) {
+        if (!v && (m.type === 'video' || m.type === 'animated_gif') && m.url) v = m.url;
+        if (!img && m.type === 'photo' && m.url) img = m.url;
+      }
+    }
+    // Back-compat: some responses may nest under media.videos/photos as arrays
+    if (!v) v = data?.media?.videos?.[0]?.url || null;
+    if (!img) img = data?.media?.photos?.[0]?.url || data?.media?.photos?.[0] || img;
 
     if(v){
       const vr=document.createElement('video');
@@ -448,7 +430,7 @@ fetchTweet.onclick=async()=>{
       tweetFetched.name=`tweet_${tweetId}.jpg`;
       tweetFetched.blob=await (await fetch(img)).blob();
     } else {
-      tweetMediaBox.innerHTML='<div class="small">⚠️ No media found in this tweet.</div>';
+      tweetMediaBox.innerHTML='<div class="small">⚠️ No video or image found in this tweet. Try another tweet with a playable clip or photo.</div>';
     }
 
     if(tweetFetched.blob){ saveFromTweet.style.display='inline-block'; }
@@ -457,7 +439,6 @@ fetchTweet.onclick=async()=>{
     tweetMediaBox.innerHTML='<div class="small">⚠️ Failed to fetch media from vxtwitter API.</div>';
   }
 };
-
 
 saveFromTweet.onclick=async()=>{
   if(!tweetFetched.blob) return;
