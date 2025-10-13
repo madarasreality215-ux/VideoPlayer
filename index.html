@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>📱 MediaTracker Pro — Final Offline Edition</title>
+<meta name="theme-color" content="#7c3aed">
+<style>
+  :root{--bg:#0b1220;--card:#0f1724;--text:#e6eef9;--muted:rgba(230,238,249,0.65);--accent:#7c3aed;--accent-hover:#6d28d9;--green:#10b981;--red:#b91c1c;--card-border:rgba(255,255,255,0.08);--card-shadow:0 10px 25px rgba(0,0,0,0.28);--radius:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  a{color:inherit;text-decoration:none}
+  header{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--card);padding:12px 16px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--card-border)}
+  h1{margin:0;font-size:18px;font-weight:700}
+  .ghost{background:transparent;border:1px solid var(--card-border);padding:10px 12px;border-radius:10px;cursor:pointer;color:#fff;transition:.25s}
+  .ghost:hover{background:rgba(255,255,255,0.08)}
+  .container{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  @media(max-width:1024px){.container{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:14px}
+  .card h3{margin:0 0 10px 0;font-size:14px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .sidebar{display:flex;flex-direction:column;gap:16px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;transition:.25s}
+  .btn:hover{background:var(--accent-hover)}
+  .btn-green{background:var(--green)}
+  .input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:transparent;color:var(--text)}
+  .small{font-size:12px;color:var(--muted)}
+  .folders-empty{color:var(--muted);text-align:center;padding:10px}
+  .folder-section{border:1px dashed var(--card-border);border-radius:12px;background:rgba(255,255,255,0.02);margin-top:8px}
+  .folder-header{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 12px;cursor:pointer;border-radius:12px}
+  .folder-left{display:flex;align-items:center;gap:8px;min-width:0}
+  .chev{transition:transform .2s}
+  .folder-header.collapsed .chev{transform:rotate(-90deg)}
+  .folder-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder-actions{display:flex;gap:6px}
+  .action{background:transparent;border:1px solid var(--card-border);color:inherit;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .action:hover{background:rgba(255,255,255,0.06)}
+  .folder-content{overflow:hidden;max-height:0;transition:max-height .25s ease,padding .25s ease;padding:0 12px}
+  .folder-content.open{padding:8px 12px 12px 44px}
+  .vlist{display:flex;flex-direction:column;gap:8px}
+  .vitem{width:260px;flex-direction:column;text-align:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px;cursor:pointer;transition:.2s}
+  .vitem:hover{background:rgba(255,255,255,0.06)}
+  .thumb{width:100%;height:150px;background:#000;border-radius:8px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#aaa}
+  .thumb video,.thumb img{width:100%;height:100%;object-fit:cover}
+  .meta h4{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{font-size:10px;background:var(--accent);color:#fff;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .main{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:12px}
+  .topbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  .search{flex:1}
+  .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--card-border);background:var(--bg);color:var(--text)}
+  .search input:focus{outline:none;border-color:var(--accent);background:var(--card)}
+  .empty{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:16px}
+  #sortBtn{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:10px 14px;font-weight:600;color:var(--muted)}
+  #sortBtn:hover{background:rgba(255,255,255,0.08)}
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9999;opacity:0;transition:opacity .25s ease}
+  .viewer.show{display:flex;opacity:1}
+</style>
+</head>
+<body>
+
+<header><h1>📱 MediaTracker Pro (Offline Edition)</h1><a class="ghost" href="login.html">🚪 Sign Out</a></header>
+<div class="container">
+<div class="sidebar">
+<div class="card"><h3>📦 Create Folder</h3><input id="newFolderName" class="input" placeholder="New folder name"><button id="addFolder" class="btn" style="margin-top:8px">📁 Add Folder</button></div>
+<div class="card">
+        <h3>🏠 Main Library</h3>
+        <div class="small breadcrumb">Viewing: <span id="viewLabel">Main Library</span></div>
+        <div id="foldersEmpty" class="folders-empty">No folders yet. Create one below!</div>
+        <div id="foldersContainer"></div>
+      </div>
+<div class="card"><h3>➕ Add Media</h3><input id="videoInput" type="file" accept="video/*" multiple style="display:none">
+<div style="margin-bottom:10px;"><button id="addVideos" class="btn" style="width:100%">🎥 Add Videos</button></div>
+<input id="photoInput" type="file" accept="image/*" multiple style="display:none">
+<div style="margin-bottom:10px;"><button id="addPhotos" class="btn btn-green" style="width:100%">📷 Add Photos</button></div>
+<div class="small" style="margin-top:6px;text-align:center">Supports MP4, WebM, MOV, JPG, PNG, GIF</div></div>
+<div class="card"><h3>🐦 Twitter/X Downloader</h3><input id="tweetUrl" class="input" placeholder="Paste Twitter/X URL here"><button id="fetchTweet" class="btn" style="width:100%;margin-top:8px">Fetch Twitter Media</button><div id="tweetPreview" class="card" style="margin-top:10px;display:none;padding:10px"><h3 style="margin-bottom:8px">🎞️ Preview</h3><div id="tweetMediaBox" style="text-align:center"></div><button id="saveFromTweet" class="btn" style="width:100%;margin-top:10px;display:none">⬇️ Download to Library</button></div></div>
+</div>
+<div class="main"><div class="topbar"><div class="search"><input id="search" placeholder="🔍 Search videos..."></div><button id="sortBtn">📅 Sort: Newest</button>
+        <button id="backToMain" class="ghost" style="display:none">🏠 Back to Main</button></div><div id="mainEmpty" class="empty">No media yet. Add some videos or photos to get started!</div><div id="mainList" style="display:none;flex-wrap:wrap;gap:12px;"></div></div>
+</div>
+
+  <!-- Viewer -->
+  <div id="viewer" class="viewer" aria-hidden="true">
+    <div class="viewer-inner">
+      <div class="viewer-topbar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:92vw;max-width:92vw;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,0.55);color:#fff;backdrop-filter:blur(12px)">
+        <span id="viewerFilename" class="title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%">🎞️ </span>
+        <button id="viewerClose" class="ghost" aria-label="Close">❌</button>
+      </div>
+      <video id="viewerVideo" playsinline controls preload="metadata" style="max-width:92vw;max-height:84vh;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.45);background:#000"></video>
+    </div>
+  </div>
+
+<script>
+const LS_KEY='mtp_meta_final';const DB_NAME='mtp_media_db';const DB_STORE='media';let state={folders:[],media:{},collapse:{},sort:'newest'};const uid=p=>p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);const save=()=>localStorage.setItem(LS_KEY,JSON.stringify(state));const load=()=>{try{Object.assign(state,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}};load();function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=e=>{e.target.result.createObjectStore(DB_STORE)};r.onerror=rej;r.onsuccess=e=>res(e.target.result)});}async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(blob,id);return new Promise(r=>tx.oncomplete=r)}async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}const foldersContainer=document.getElementById('foldersContainer'),foldersEmpty=document.getElementById('foldersEmpty'),newFolderName=document.getElementById('newFolderName'),addFolderBtn=document.getElementById('addFolder'),videoInput=document.getElementById('videoInput'),addVideos=document.getElementById('addVideos'),photoInput=document.getElementById('photoInput'),addPhotos=document.getElementById('addPhotos'),searchEl=document.getElementById('search'),mainEmpty=document.getElementById('mainEmpty'),mainList=document.getElementById('mainList'),sortBtn=document.getElementById('sortBtn'),viewer=document.getElementById('viewer'),viewerVideo=document.getElementById('viewerVideo');function addFolder(name){const f={id:uid('fld'),name:name.trim(),parentId:''};state.folders.push(f);save();render();}function render(){foldersContainer.innerHTML='';const q=(searchEl.value||'').toLowerCase();const items=Object.values(state.media).filter(m=>(m.name||'').toLowerCase().includes(q));mainList.innerHTML='';if(!items.length){mainEmpty.style.display='flex';mainList.style.display='none';}else{mainEmpty.style.display='none';mainList.style.display='flex';for(const m of items)renderItem(m);}}async function renderItem(m){const el=document.createElement('div');el.className='vitem';const th=document.createElement('div');th.className='thumb';const blob=await dbGet(m.dbKey);if(blob){const url=URL.createObjectURL(blob);if(m.type==='photo'){const i=new Image();i.src=url;th.appendChild(i);}else{const v=document.createElement('video');v.src=url;v.muted=true;v.playsInline=true;th.appendChild(v);}}const meta=document.createElement('div');const h=document.createElement('h4');h.textContent=m.name||'';meta.appendChild(h);el.append(th,meta);el.onclick=()=>openViewer(m);mainList.appendChild(el);}async function openViewer(m){if(m.type!=='video'){const blob=await dbGet(m.dbKey);if(!blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=m.name||'image';a.click();return;}const blob=await dbGet(m.dbKey);if(!blob)return;const url=URL.createObjectURL(blob);viewerVideo.src=url;viewer.classList.add('show');viewerVideo.play();}viewer.onclick=()=>{viewer.classList.remove('show');viewerVideo.pause();};addFolderBtn.onclick=()=>{const n=(newFolderName.value||'').trim();if(!n)return;addFolder(n);newFolderName.value='';render();};addVideos.onclick=()=>videoInput.click();addPhotos.onclick=()=>photoInput.click();videoInput.onchange=async e=>{for(const f of e.target.files){const id=uid('vid');await dbPut(id,f);state.media[id]={id,name:f.name,type:'video',dbKey:id,createdAt:Date.now()};}save();render();};photoInput.onchange=async e=>{for(const f of e.target.files){const id=uid('img');await dbPut(id,f);state.media[id]={id,name:f.name,type:'photo',dbKey:id,createdAt:Date.now()};}save();render();};searchEl.oninput=()=>render();sortBtn.onclick=()=>{state.sort=state.sort==='newest'?'oldest':'newest';sortBtn.textContent=state.sort==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest';save();render();};const tweetUrl=document.getElementById('tweetUrl'),fetchTweet=document.getElementById('fetchTweet'),tweetPreview=document.getElementById('tweetPreview'),tweetMediaBox=document.getElementById('tweetMediaBox'),saveFromTweet=document.getElementById('saveFromTweet');let tweetFetched={type:null,name:null,blob:null};fetchTweet.onclick=async()=>{const url=(tweetUrl.value||'').trim();if(!url)return;const idMatch=url.match(/status\/(\d+)/);if(!idMatch){alert('Invalid Twitter/X URL');return;}const tweetId=idMatch[1];tweetPreview.style.display='block';tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';saveFromTweet.style.display='none';try{
+
+tweetMediaBox.innerHTML = '<div class="small">⏳ Fetching media…</div>';
+saveFromTweet.style.display = 'none';
+let found = false;
+
+// --- Try SnapSave (via AllOrigins proxy) ---
+try {
+  const proxyUrl = "https://api.allorigins.win/get?url=" + 
+    encodeURIComponent("https://snapsave.io/twitter-downloader?url=" + url);
+  const res = await fetch(proxyUrl);
+  const data = await res.json();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(data.contents, "text/html");
+  const videoLink = doc.querySelector("a[href$='.mp4']")?.href;
+  const imgLink = doc.querySelector("a[href$='.jpg'], a[href$='.png']")?.href;
+  if (videoLink || imgLink) {
+    tweetMediaBox.innerHTML = '';
+    if (videoLink) {
+      const vr = document.createElement('video');
+      vr.src = videoLink;
+      vr.controls = true;
+      vr.autoplay = true;
+      vr.muted = true;
+      vr.style.maxWidth = '100%';
+      vr.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(vr);
+      tweetFetched.type = 'video';
+      tweetFetched.name = `tweet_${tweetId}.mp4`;
+      tweetFetched.blob = await (await fetch(videoLink)).blob();
+    } else {
+      const ir = new Image();
+      ir.src = imgLink;
+      ir.style.maxWidth = '100%';
+      ir.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(ir);
+      tweetFetched.type = 'photo';
+      tweetFetched.name = `tweet_${tweetId}.jpg`;
+      tweetFetched.blob = await (await fetch(imgLink)).blob();
+    }
+    found = true;
+  }
+} catch(e) { console.log("SnapSave failed", e); }
+
+// --- Try FixTweet if SnapSave failed ---
+if (!found) {
+  tweetMediaBox.innerHTML = '<div class="small">⏳ Checking alternative sources…</div>';
+  try {
+    const res2 = await fetch(`https://fixupx.com/api/tweet/${tweetId}`);
+    const data2 = await res2.json();
+    const v = data2?.media?.videos?.[0]?.url;
+    const img = data2?.media?.photos?.[0];
+    tweetMediaBox.innerHTML = '';
+    if (v) {
+      const vr = document.createElement('video');
+      vr.src = v;
+      vr.controls = true;
+      vr.autoplay = true;
+      vr.muted = true;
+      vr.style.maxWidth = '100%';
+      vr.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(vr);
+      tweetFetched.type = 'video';
+      tweetFetched.name = `tweet_${tweetId}.mp4`;
+      tweetFetched.blob = await (await fetch(v)).blob();
+      found = true;
+    } else if (img) {
+      const ir = new Image();
+      ir.src = img;
+      ir.style.maxWidth = '100%';
+      ir.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(ir);
+      tweetFetched.type = 'photo';
+      tweetFetched.name = `tweet_${tweetId}.jpg`;
+      tweetFetched.blob = await (await fetch(img)).blob();
+      found = true;
+    }
+  } catch(e) { console.log("FixTweet failed", e); }
+}
+
+// --- Try TwitSave if both failed ---
+if (!found) {
+  tweetMediaBox.innerHTML = '<div class="small">⏳ Checking alternative sources…</div>';
+  try {
+    const proxyUrl2 = "https://api.allorigins.win/get?url=" + 
+      encodeURIComponent("https://twitsave.com/info?url=" + url);
+    const res3 = await fetch(proxyUrl2);
+    const data3 = await res3.json();
+    const parser2 = new DOMParser();
+    const doc2 = parser2.parseFromString(data3.contents, "text/html");
+    const videoLink2 = doc2.querySelector("a[href$='.mp4']")?.href;
+    const imgLink2 = doc2.querySelector("a[href$='.jpg'], a[href$='.png']")?.href;
+    tweetMediaBox.innerHTML = '';
+    if (videoLink2) {
+      const vr = document.createElement('video');
+      vr.src = videoLink2;
+      vr.controls = true;
+      vr.autoplay = true;
+      vr.muted = true;
+      vr.style.maxWidth = '100%';
+      vr.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(vr);
+      tweetFetched.type = 'video';
+      tweetFetched.name = `tweet_${tweetId}.mp4`;
+      tweetFetched.blob = await (await fetch(videoLink2)).blob();
+      found = true;
+    } else if (imgLink2) {
+      const ir = new Image();
+      ir.src = imgLink2;
+      ir.style.maxWidth = '100%';
+      ir.style.borderRadius = '10px';
+      tweetMediaBox.appendChild(ir);
+      tweetFetched.type = 'photo';
+      tweetFetched.name = `tweet_${tweetId}.jpg`;
+      tweetFetched.blob = await (await fetch(imgLink2)).blob();
+      found = true;
+    }
+  } catch(e) { console.log("TwitSave failed", e); }
+}
+
+// --- Final status ---
+if (found) {
+  saveFromTweet.style.display = 'block';
+} else {
+  tweetMediaBox.innerHTML = '<div class="small">⚠️ No media found from any source.</div>';
+}
+
+}catch{tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch media.</div>';}};saveFromTweet.onclick=async()=>{if(!tweetFetched.blob)return;const id=uid(tweetFetched.type==='video'?'vid':'img');await dbPut(id,tweetFetched.blob);state.media[id]={id,name:tweetFetched.name,type:tweetFetched.type,dbKey:id,createdAt:Date.now()};save();render();};render();
+</script>
+
+<script>
+
+// ===== State (LocalStorage + IndexedDB) =====
+const LS_KEY='mtp_meta_v5_allfeatures';
+const DB_NAME='mtp_media_db';
+const DB_STORE='media';
+let state={folders:[],media:{},collapse:{},sort:'newest',activeFolderId:''};
+const uid=p=>p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+const save=()=>localStorage.setItem(LS_KEY,JSON.stringify(state));
+const load=()=>{try{Object.assign(state,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}};load();
+
+// Persist proxy endpoint separately
+const PROXY_LS_KEY='mtp_multidl_proxy';
+function getProxy(){ return localStorage.getItem(PROXY_LS_KEY)||''; }
+function setProxy(v){ localStorage.setItem(PROXY_LS_KEY,v||''); }
+
+// ===== IndexedDB helpers =====
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=e=>{e.target.result.createObjectStore(DB_STORE)};r.onerror=rej;r.onsuccess=e=>res(e.target.result)});}
+async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(blob,id);return new Promise(r=>tx.oncomplete=r)}
+async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}
+async function dbDel(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(id);return new Promise(r=>tx.oncomplete=r)}
+
+// ===== DOM refs =====
+const foldersContainer=document.getElementById('foldersContainer');
+const foldersEmpty=document.getElementById('foldersEmpty');
+const newFolderName=document.getElementById('newFolderName');
+const addFolderBtn=document.getElementById('addFolder');
+
+const videoInput=document.getElementById('videoInput');
+const addVideos=document.getElementById('addVideos');
+const photoInput=document.getElementById('photoInput');
+const addPhotos=document.getElementById('addPhotos');
+
+const searchEl=document.getElementById('search');
+const mainEmpty=document.getElementById('mainEmpty');
+const mainList=document.getElementById('mainList');
+const sortBtn=document.getElementById('sortBtn');
+const backToMain=document.getElementById('backToMain');
+const viewLabel=document.getElementById('viewLabel');
+
+const viewer=document.getElementById('viewer');
+const viewerVideo=document.getElementById('viewerVideo');
+const viewerFilename=document.getElementById('viewerFilename');
+const viewerClose=document.getElementById('viewerClose');
+
+
+
+// ===== Utils =====
+function sorter(){return (a,b)=>state.sort==='newest'?(b.createdAt||0)-(a.createdAt||0):(a.createdAt||0)-(b.createdAt||0)}
+function buildTree(pid=''){return state.folders.filter(f=>(f.parentId||'')===(pid||'')).map(f=>({...f,children:buildTree(f.id)}));}
+function folderCount(id){return Object.values(state.media).filter(m=>(m.folderId||'')===id).length}
+
+// ===== Folders Render (no expansion list; actions only when selected) =====
+function renderFolders(){
+  const tree=buildTree('');
+  foldersContainer.innerHTML='';
+  foldersEmpty.style.display=state.folders.length?'none':'block';
+  tree.forEach(n=>appendFolderHeader(n,true,foldersContainer));
+}
+
+function appendFolderHeader(node,isRoot,host){
+  const section=document.createElement('div');
+  section.className='folder-section'+(state.activeFolderId===node.id?' active':'');
+
+  const header=document.createElement('div');
+  header.className='folder-header';
+  header.dataset.id=node.id;
+
+  const left=document.createElement('div'); left.className='folder-left';
+  const title=document.createElement('span'); title.className='folder-title'; title.textContent='📁 '+node.name;
+  const count=document.createElement('span'); count.className='folder-count'; count.textContent=`(${folderCount(node.id)} items)`;
+  left.append(title,count);
+
+  const actions=document.createElement('div'); actions.className='folder-actions';
+  const addSub=document.createElement('button'); addSub.className='action'; addSub.textContent='➕ Sub';
+  addSub.onclick=e=>{ e.stopPropagation(); const name=prompt('Subfolder name?'); if(!name||!name.trim())return;
+    const f={id:uid('fld'),name:name.trim(),parentId:node.id}; state.folders.push(f); save(); renderFolders();
+  };
+  const ren=document.createElement('button'); ren.className='action'; ren.textContent='✏️ Rename';
+  ren.onclick=e=>{ e.stopPropagation(); const name=prompt('Rename folder:',node.name); if(!name||!name.trim())return;
+    const f=state.folders.find(x=>x.id===node.id); if(f){f.name=name.trim(); save(); renderFolders(); if(state.activeFolderId===node.id) viewLabel.textContent=f.name; }
+  };
+  const del=document.createElement('button'); del.className='action'; del.textContent='🗑️ Delete';
+  del.onclick=e=>{ e.stopPropagation(); if(!confirm('Delete this folder and ALL of its contents?'))return;
+    deleteFolder(node.id); if(state.activeFolderId===node.id){ state.activeFolderId=''; } save(); renderFolders(); renderMain();
+  };
+  actions.append(addSub,ren,del);
+
+  header.append(left,actions);
+  section.appendChild(header);
+
+  // Select folder: show its media in main; keep header compact
+  header.onclick=()=>{
+    state.activeFolderId = node.id;
+    viewLabel.textContent = node.name;
+    backToMain.style.display='inline-block';
+    renderFolders(); renderMain();
+  };
+
+  // Allow dropping items to move into this folder
+  header.addEventListener('dragover',e=>{ e.preventDefault(); section.style.outline='2px dashed rgba(255,255,255,0.25)'; });
+  header.addEventListener('dragleave',()=>{ section.style.outline='none'; });
+  header.addEventListener('drop',e=>{
+    e.preventDefault(); section.style.outline='none';
+    const id=e.dataTransfer.getData('text/id'); if(!id) return;
+    const m=state.media[id]; if(!m) return;
+    m.folderId=node.id; save(); renderFolders(); renderMain();
+  });
+
+  // Render children headers only (nested)
+  if(node.children && node.children.length){
+    const nest=document.createElement('div'); nest.style.marginLeft='16px';
+    node.children.forEach(ch=> appendFolderHeader(ch,false,nest));
+    section.appendChild(nest);
+  }
+
+  host.appendChild(section);
+}
+
+function deleteFolder(id){
+  // delete children first
+  state.folders.filter(f=>f.parentId===id).forEach(ch=>deleteFolder(ch.id));
+  // delete media in this folder
+  for(const m of Object.values(state.media)){ if(m.folderId===id){ delete state.media[m.id]; } }
+  // remove folder
+  state.folders=state.folders.filter(f=>f.id!==id);
+}
+
+// ===== Main grid render =====
+async function renderMain(){
+  const all=Object.values(state.media||{});
+  const q=(searchEl.value||'').trim().toLowerCase();
+  // Show only unassigned in Main Library; or items in selected folder
+  const inFolder = !!state.activeFolderId;
+  const filtered=all.filter(m=>{
+    const inScope = inFolder ? (m.folderId||'')===state.activeFolderId : !(m.folderId);
+    return inScope && (m.name||'').toLowerCase().includes(q);
+  }).sort(sorter());
+
+  mainList.innerHTML='';
+  if(!filtered.length){ mainEmpty.style.display='flex'; mainList.style.display='none'; return; }
+  mainEmpty.style.display='none'; mainList.style.display='flex';
+  for(const m of filtered){ mainList.appendChild(await renderItem(m)); }
+}
+
+// Render one media card
+async function renderItem(m){
+  const el=document.createElement('div');
+  el.className='vitem';
+  el.draggable=true;
+  el.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/id',m.id); });
+
+  const th=document.createElement('div'); th.className='thumb';
+  const blob=await dbGet(m.dbKey);
+  if(blob){
+    const url=URL.createObjectURL(blob);
+    if(m.type==='photo'){ const i=new Image(); i.src=url; th.appendChild(i); }
+    else { const v=document.createElement('video'); v.src=url; v.muted=true; v.playsInline=true; th.appendChild(v); }
+  }else{
+    const p=document.createElement('div'); p.textContent='(missing)'; th.appendChild(p);
+  }
+
+  const meta=document.createElement('div');
+  const h=document.createElement('h4'); h.textContent=m.name||'(untitled)';
+  const badge=document.createElement('span'); badge.className='badge'; badge.textContent=(m.type||'').toUpperCase();
+  h.appendChild(badge); meta.appendChild(h);
+
+  const actions=document.createElement('div'); actions.className='item-actions';
+  const delBtn=document.createElement('button'); delBtn.className='item-btn'; delBtn.title='Delete'; delBtn.textContent='🗑️';
+  delBtn.onclick=async (e)=>{
+    e.stopPropagation();
+    if(!confirm('Delete "'+(m.name||'(untitled)')+'"?')) return;
+    await dbDel(m.dbKey); delete state.media[m.id]; save(); renderFolders(); renderMain();
+  };
+  actions.appendChild(delBtn);
+
+  el.append(th,meta,actions);
+  el.onclick=()=>openViewer(m);
+  return el;
+}
+
+// ===== Viewer with custom controls (+ keyboard) =====
+function showControls(){}
+
+
+
+async function openViewer(m){
+  if(m.type!=='video'){ const blob=await dbGet(m.dbKey); if(!blob) return; const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=m.name||'image'; a.click(); return; }
+  const blob=await dbGet(m.dbKey); if(!blob) return;
+  const url=URL.createObjectURL(blob);
+  (viewerFilename?viewerFilename:{textContent:null}).textContent='🎞️ '+(m.name||'');
+  viewerVideo.src=url;
+  viewer.classList.add('show');
+  viewer.setAttribute('aria-hidden','false');
+  viewerVideo.play().catch(()=>{});
+  showControls();
+}
+if(viewerClose){viewerClose.onclick=()=>{ viewer.classList.remove('show'); viewer.setAttribute('aria-hidden','true'); viewerVideo.pause(); };
+viewer.addEventListener('click',e=>{ if(e.target===viewer && viewerClose) viewerClose.click(); });
+
+
+
+
+
+
+
+
+// ===== Buttons & Uploads =====
+addFolderBtn.onclick=()=>{
+  const n=(newFolderName.value||'').trim(); if(!n) return;
+  const f={id:uid('fld'),name:n,parentId:''}; state.folders.push(f); save(); newFolderName.value=''; renderFolders();
+};
+addVideos.onclick=()=> videoInput.click();
+addPhotos.onclick=()=> photoInput.click();
+
+videoInput.onchange=async e=>{
+  for(const f of Array.from(e.target.files||[])){
+    const id=uid('vid'); await dbPut(id,f);
+    state.media[id]={id,name:f.name,type:'video',dbKey:id,createdAt:Date.now(),folderId:state.activeFolderId||''};
+  }
+  save(); renderFolders(); renderMain(); videoInput.value='';
+};
+photoInput.onchange=async e=>{
+  for(const f of Array.from(e.target.files||[])){
+    const id=uid('img'); await dbPut(id,f);
+    state.media[id]={id,name:f.name,type:'photo',dbKey:id,createdAt:Date.now(),folderId:state.activeFolderId||''};
+  }
+  save(); renderFolders(); renderMain(); photoInput.value='';
+};
+
+searchEl.oninput=()=>{ renderMain(); };
+sortBtn.onclick=()=>{ state.sort=state.sort==='newest'?'oldest':'newest'; sortBtn.textContent=state.sort==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest'; save(); renderMain(); };
+
+// Return to root (Main Library shows unassigned only)
+backToMain.onclick=()=>{ state.activeFolderId=''; backToMain.style.display='none'; viewLabel.textContent='Main Library'; renderFolders(); renderMain(); };
+
+// ===== Drag to main grid root (remove from folder) =====
+mainList.addEventListener('dragover',e=>{ e.preventDefault(); mainList.style.outline='2px dashed rgba(255,255,255,0.25)'; });
+mainList.addEventListener('dragleave',()=>{ mainList.style.outline='none'; });
+mainList.addEventListener('drop',e=>{
+  e.preventDefault(); mainList.style.outline='none';
+  const id=e.dataTransfer.getData('text/id'); if(!id) return;
+  const m=state.media[id]; if(!m) return;
+  // Only allow dropping to root if currently viewing Main Library
+  if(state.activeFolderId){ return; }
+  m.folderId=''; save(); renderFolders(); renderMain();
+});
+
+// ===== Twitter (FixTweet) =====
+const tweetUrl=document.getElementById('tweetUrl');
+const fetchTweet=document.getElementById('fetchTweet');
+const tweetPreview=document.getElementById('tweetPreview');
+const tweetMediaBox=document.getElementById('tweetMediaBox');
+const saveFromTweet=document.getElementById('saveFromTweet');
+let tweetFetched={type:null,name:null,blob:null};
+
+fetchTweet.onclick=async()=>{
+  const url=(tweetUrl.value||'').trim(); if(!url) return;
+  const idMatch=url.match(/status\/(\d+)/);
+  if(!idMatch){ alert('Invalid Twitter/X URL'); return; }
+  const tweetId=idMatch[1];
+  tweetPreview.style.display='block';
+  saveFromTweet.style.display='none';
+  tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';
+  try{
+    const res=await fetch(`https://fixupx.com/api/tweet/${tweetId}`);
+    const data=await res.json();
+    const v=data?.media?.videos?.[0]?.url;
+    const img=data?.media?.photos?.[0];
+    tweetMediaBox.innerHTML='';
+    tweetFetched={type:null,name:null,blob:null};
+    if(v){
+      const vr=document.createElement('video'); vr.src=v; vr.controls=true; vr.autoplay=true; vr.muted=true; vr.style.maxWidth='100%'; vr.style.borderRadius='10px';
+      tweetMediaBox.appendChild(vr);
+      tweetFetched.type='video'; tweetFetched.name=`tweet_${tweetId}.mp4`; tweetFetched.blob=await (await fetch(v)).blob();
+    } else if(img){
+      const ir=new Image(); ir.src=img; ir.style.maxWidth='100%'; ir.style.borderRadius='10px';
+      tweetMediaBox.appendChild(ir);
+      tweetFetched.type='photo'; tweetFetched.name=`tweet_${tweetId}.jpg`; tweetFetched.blob=await (await fetch(img)).blob();
+    } else {
+      tweetMediaBox.innerHTML='<div class="small">⚠️ No media found in this tweet.</div>';
+    }
+    if(tweetFetched.blob){ saveFromTweet.style.display='inline-block'; }
+  }catch(e){
+    tweetMediaBox.innerHTML='<div class="small">❌ Failed to fetch media.</div>';
+  }
+};
+
+saveFromTweet.onclick=async()=>{
+  if(!tweetFetched.blob) return;
+  const id=uid(tweetFetched.type==='video'?'vid':'img');
+  await dbPut(id,tweetFetched.blob);
+  state.media[id]={id,name:tweetFetched.name,type:tweetFetched.type,dbKey:id,createdAt:Date.now(),folderId:state.activeFolderId||''};
+  save(); renderFolders(); renderMain();
+  tweetPreview.style.display='none'; tweetMediaBox.innerHTML=''; tweetUrl.value='';
+};
+
+// ===== Initial render =====
+renderFolders(); renderMain();
+// Safety: initialize
+if (typeof renderFolders === 'function') renderFolders();
+if (typeof renderMain === 'function') renderMain();
+</script>
+</body>
+</html>
