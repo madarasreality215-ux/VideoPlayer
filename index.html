@@ -1,0 +1,1592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>📱 Romani's Media Archive — Offline (FixTweet v2 + Quality + Multi-Source)</title>
+<meta name="theme-color" content="#4a86e8">
+
+<!-- PATCH: force background color for GitHub Pages -->
+<style>
+html,body{
+  background:#1a1f2e!important;
+  color:#e6eef9!important;
+}
+
+/* --- DROPDOWN + WRAP PATCH --- */
+.folder-header{flex-wrap:wrap;}
+.folder-left{flex:1 1 auto; min-width:0; overflow:hidden;}
+.folder-actions{flex-shrink:0; margin-top:4px}
+
+.folder-menu{position:relative; display:inline-block}
+.folder-menu-btn{background:transparent; border:1px solid var(--card-border); color:inherit;
+  border-radius:8px; padding:4px 8px; cursor:pointer; font-size:12px}
+.folder-menu-btn:hover{background:rgba(255,255,255,0.06)}
+.folder-menu-content{display:none; position:absolute; right:0; background:var(--card);
+  border:1px solid var(--card-border); border-radius:8px; box-shadow:var(--card-shadow);
+  z-index:99; min-width:140px}
+.folder-menu-content button{display:block; width:100%; text-align:left; background:transparent;
+  border:none; color:inherit; padding:8px 10px; font-size:12px; cursor:pointer}
+.folder-menu-content button:hover{background:var(--accent-hover); color:#fff}
+.folder-menu.show .folder-menu-content{display:block}
+
+
+/* --- DRAGFIX PATCH --- */
+.thumb, video, img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+.vitem:active {
+  opacity: 0.75;
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+.vitem[draggable="true"] {
+  cursor: grab;
+}
+.vitem[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+
+.vitem[draggable="true"] {
+  cursor: grab;
+}
+.vitem[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.8;
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+</style>
+<!-- END PATCH -->
+<style>
+  :root{
+    --bg:#1a1f2e;--card:#232a3d;--text:#e6eef9;--muted:rgba(230,238,249,0.65);
+    --accent:#4a86e8;--accent-hover:#3a76d8;--green:#10b981;--red:#b91c1c;
+    --card-border:rgba(255,255,255,0.08);--card-shadow:0 10px 25px rgba(0,0,0,0.28);
+    --radius:14px
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  a{color:inherit;text-decoration:none}
+  header{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--card);padding:12px 16px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--card-border)}
+  h1{margin:0;font-size:18px;font-weight:700}
+  .ghost{background:transparent;border:1px solid var(--card-border);padding:10px 12px;border-radius:10px;cursor:pointer;color:#fff;transition:.25s}
+  .ghost:hover{background:rgba(255,255,255,0.08)}
+  .container{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;min-height:calc(100vh - 60px)}
+  /* REMOVED mobile breakpoint to maintain exact layout */
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:14px}
+  .card h3{margin:0 0 10px 0;font-size:14px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .sidebar{display:flex;flex-direction:column;gap:16px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;transition:.25s}
+  .btn:hover{background:var(--accent-hover)}
+  .btn-green{background:var(--green)}
+  .input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:transparent;color:var(--text)}
+  .small{font-size:12px;color:var(--muted)}
+  .folders-empty{color:var(--muted);text-align:center;padding:10px}
+  .folder-section{border:1px dashed var(--card-border);border-radius:12px;background:rgba(255,255,255,0.02);margin-top:8px}
+  .folder-header{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 12px;cursor:pointer;border-radius:12px}
+  .folder-left{display:flex;align-items:center;gap:8px;min-width:0}
+  .folder-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder-actions{display:flex;gap:6px}
+  .action{background:transparent;border:1px solid var(--card-border);color:inherit;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .action:hover{background:rgba(255,255,255,0.06)}
+  .toggle-icon{display:inline-block;width:16px;text-align:center;opacity:.85}
+  .main{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:12px}
+  .topbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  .search{flex:1}
+  .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--card-border);background:var(--bg);color:var(--text)}
+  .search input:focus{outline:none;border-color:var(--accent);background:var(--card)}
+  .empty{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:16px}
+  #sortBtn{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:10px 14px;font-weight:600;color:var(--muted)}
+  #sortBtn:hover{background:rgba(255,255,255,0.08)}
+
+  /* Viewer overlay */
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9999;opacity:0;transition:opacity .25s ease}
+  .viewer.show{display:flex;opacity:1}
+  .viewer-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;margin:0 auto;padding:0 12px}
+  #viewer .viewer-topbar{width:100% !important;max-width:100% !important;margin:0 auto 12px !important;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,0.55);color:#fff;backdrop-filter:blur(12px)}
+  #viewerVideo{display:block;margin:0 auto;max-width:92vw;max-height:84vh;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.45);background:#000}
+  #viewerImage{display:none;margin:0 auto;max-width:92vw;max-height:84vh;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.45);object-fit:contain;background:#000}
+
+  /* Center all native videos in cards */
+  video{display:block;margin:0 auto}
+
+  /* Dropdown styling */
+  select#fetchMode{
+    appearance:none;-webkit-appearance:none;-moz-appearance:none;
+    background-color:var(--card);color:var(--text);border:1px solid var(--card-border);
+    padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer;transition:.2s ease
+  }
+  select#fetchMode:hover{background-color:rgba(255,255,255,0.05)}
+  select#fetchMode:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(74,134,232,.4)}
+  select#fetchMode option{background-color:var(--card);color:var(--text);font-weight:500}
+  select#fetchMode option:checked,select#fetchMode option:hover{background-color:var(--accent);color:#fff}
+
+  /* Quality select */
+  select#qualitySelect{width:100%;margin-top:8px;padding:8px;border-radius:8px;background:var(--card);color:var(--text);border:1px solid var(--card-border)}
+
+  /* Toast */
+  .toast{position:fixed;right:16px;bottom:16px;background:rgba(35,42,61,.95);color:#e6eef9;padding:10px 14px;border:1px solid rgba(255,255,255,.08);border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,.35);opacity:0;transform:translateY(12px);transition:opacity .25s ease,transform .25s ease;pointer-events:none;z-index:10000}
+  .toast.show{opacity:1;transform:translateY(0)}
+
+  .thumb{width:260px;height:150px;background:#000;border-radius:8px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#aaa}
+  .vitem{width:260px;display:flex;flex-direction:column;text-align:center;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px;cursor:pointer;transition:.2s;margin:6px}
+  .vitem:hover{background:rgba(255,255,255,0.06)}
+  .badge{font-size:10px;background:var(--accent);color:#fff;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .item-actions{display:flex;justify-content:center;gap:8px;margin-top:6px}
+  .item-btn{background:transparent;border:1px solid var(--card-border);color:inherit;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .item-btn:hover{background:rgba(255,255,255,0.06)}
+  /* --- Contain long filenames in cards --- */
+  .vitem h4 {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: break-all;
+    display: block;
+    margin: 6px 0 0 0;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  /* MOBILE: Force exact same layout with horizontal scrolling */
+  @media (max-width: 768px) {
+    .container {
+      grid-template-columns: 340px 1fr;
+      overflow-x: auto;
+    }
+    body {
+      overflow-x: auto;
+      min-width: 800px;
+    }
+    .main {
+      min-width: 400px;
+    }
+    .sidebar {
+      min-width: 340px;
+    }
+  }
+
+</style>
+
+</head>
+<body>
+<header>
+  <h1>📱 Romani's Media Archive</h1>
+  <a class="ghost" href="login.html">🚪 Sign Out</a>
+</header>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="card">
+      <h3>📦 Create Folder</h3>
+      <input id="newFolderName" class="input" placeholder="New folder name">
+      <button id="addFolder" class="btn" style="margin-top:8px">📁 Add Folder</button>
+    </div>
+
+    <div class="card">
+      <h3>🏠 Main Library</h3>
+      <div class="small breadcrumb">Viewing: <span id="viewLabel">Main Library</span></div>
+      <div id="foldersEmpty" class="folders-empty">No folders yet. Create one below!</div>
+      <div id="foldersContainer"></div>
+    </div>
+
+    <div class="card">
+      <h3>➕ Add Media</h3>
+      <input id="videoInput" type="file" accept="video/*" multiple style="display:none">
+      <div style="margin-bottom:10px;"><button id="addVideos" class="btn" style="width:100%">🎥 Add Videos</button></div>
+      <input id="photoInput" type="file" accept="image/*" multiple style="display:none">
+      <div style="margin-bottom:10px;"><button id="addPhotos" class="btn btn-green" style="width:100%">📷 Add Photos</button></div>
+      <div class="small" style="margin-top:6px;text-align:center">Supports MP4, WebM, MOV, JPG, PNG, GIF</div>
+    </div>
+
+    <div class="card">
+      <h3>🐦 Multi-Source Downloader</h3>
+      <select id="fetchMode" class="input" style="margin-bottom:8px">
+        <option value="twitter">🐦 Twitter/X (Multiple APIs)</option>
+        <option value="generic">🌍 Generic / Direct Media</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <input type="checkbox" id="deepScanToggle" checked>
+        <span>🔍 Deep-scan pages for hidden media</span>
+      </label>
+      <input id="tweetUrl" class="input" placeholder="Paste URL here">
+      <button id="fetchTweet" class="btn" style="width:100%;margin-top:8px">Fetch Media</button>
+      <div id="tweetPreview" class="card" style="margin-top:10px;display:none;padding:10px">
+        <h3 style="margin-bottom:8px">🎞️ Preview</h3>
+        <div id="tweetMediaBox" style="text-align:center"></div>
+        <select id="qualitySelect" style="display:none;"></select>
+      </div>
+      <button id="saveFromTweet" class="btn" style="width:100%;margin-top:10px;display:none">⬇️ Download to Library</button>
+    </div>
+    <div class="card">
+      <h3>📤 Import / Export Files</h3>
+      <button id="exportLibrary" class="btn" style="width:100%;margin-bottom:8px">⬇️ Export Library (.zip)</button>
+      <input id="importFolderInput" type="file" webkitdirectory directory multiple style="display:none">
+      <button id="importLibrary" class="btn btn-green" style="width:100%">📦 Import Library (unzipped folder)</button>
+      <div class="small" style="margin-top:6px">
+        Export creates a .zip backup. To import, first unzip it locally, then select the folder.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search"><input id="search" placeholder="🔍 Search videos..."></div>
+      <button id="sortBtn">📅 Sort: Newest</button>
+      <button id="backToMain" class="ghost" style="display:none">🏠 Back to Main</button>
+    </div>
+    <div id="mainEmpty" class="empty">No media yet. Add some videos or photos to get started!</div>
+    <div id="mainList" style="display:none;flex-wrap:wrap;gap:12px;"></div>
+  </div>
+</div>
+
+<!-- Viewer -->
+<div id="viewer" class="viewer" aria-hidden="true">
+  <div class="viewer-inner">
+    <div class="viewer-topbar">
+      <button id="viewerPrev" class="ghost" aria-label="Previous">⏮</button>
+      <span id="viewerFilename" class="title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%">🎞️ </span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="viewerNext" class="ghost" aria-label="Next">⏭</button>
+        <button id="viewerClose" class="ghost" aria-label="Close">❌</button>
+      </div>
+    </div>
+    <video id="viewerVideo" playsinline controls preload="metadata"></video>
+    <img id="viewerImage" alt="Image preview" />
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =========================
+   Persistent State
+========================= */
+const LS_KEY='mtp_meta_v5_allfeatures';
+const DB_NAME='mtp_media_db';
+const DB_STORE='media';
+let state={folders:[],media:{},collapse:{},sort:'newest',activeFolderId:'',viewerCurrent:null};
+const uid=p=>p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+const save=()=>localStorage.setItem(LS_KEY,JSON.stringify(state));
+const load=()=>{try{Object.assign(state,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}};
+load();
+
+/* =========================
+   IndexedDB helpers
+========================= */
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{e.target.result.createObjectStore(DB_STORE)};
+    r.onerror=rej; r.onsuccess=e=>res(e.target.result);
+  });
+}
+async function dbPut(id,blob){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(blob,id);return new Promise(r=>tx.oncomplete=r)}
+async function dbGet(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(id);return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=rej})}
+async function dbDel(id){const db=await openDB();const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(id);return new Promise(r=>tx.oncomplete=r)}
+
+/* =========================
+   DOM refs
+========================= */
+const foldersContainer=document.getElementById('foldersContainer');
+const foldersEmpty=document.getElementById('foldersEmpty');
+const newFolderName=document.getElementById('newFolderName');
+const addFolderBtn=document.getElementById('addFolder');
+
+const videoInput=document.getElementById('videoInput');
+const addVideos=document.getElementById('addVideos');
+const photoInput=document.getElementById('photoInput');
+const addPhotos=document.getElementById('addPhotos');
+
+const searchEl=document.getElementById('search');
+const mainEmpty=document.getElementById('mainEmpty');
+const mainList=document.getElementById('mainList');
+const sortBtn=document.getElementById('sortBtn');
+const backToMain=document.getElementById('backToMain');
+const viewLabel=document.getElementById('viewLabel');
+
+const viewer=document.getElementById('viewer');
+const viewerVideo=document.getElementById('viewerVideo');
+const viewerImage=document.getElementById('viewerImage');
+const viewerFilename=document.getElementById('viewerFilename');
+const viewerClose=document.getElementById('viewerClose');
+const viewerPrev=document.getElementById('viewerPrev');
+const viewerNext=document.getElementById('viewerNext');
+const toast=document.getElementById('toast');
+
+/* Deep-scan toggle */
+const DS_KEY='mtp_deepscan_enabled';
+const deepScanToggle=document.getElementById('deepScanToggle');
+if (deepScanToggle){
+  const saved = localStorage.getItem(DS_KEY);
+  deepScanToggle.checked = (saved === null) ? true : saved === '1';
+  deepScanToggle.addEventListener('change', ()=>{
+    localStorage.setItem(DS_KEY, deepScanToggle.checked ? '1' : '0');
+  });
+}
+const deepScanEnabled = () => (deepScanToggle ? deepScanToggle.checked : true);
+
+/* =========================
+   Utils
+========================= */
+function sorter(){return (a,b)=>state.sort==='newest'?(b.createdAt||0)-(a.createdAt||0):(a.createdAt||0)-(b.createdAt||0)}
+function buildTree(pid=''){return state.folders.filter(f=>(f.parentId||'')===(pid||'')).map(f=>({...f,children:buildTree(f.id)}));}
+function folderCount(id){return Object.values(state.media).filter(m=>(m.folderId||'')===id).length}
+function showToast(msg,ms=2600){toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),ms)}
+function htmlUnescape(s){ return s.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>'); }
+function isDirectMedia(u){ return /\.(mp4|webm|mov|m4v|jpg|jpeg|png|gif)(\?.*)?$/i.test(u); }
+function filenameFromUrl(u, fallback){
+  try{
+    const p=new URL(u);
+    const last=(p.pathname.split('/').pop()||'').split('?')[0];
+    return last || (fallback||'download');
+  }catch{ return fallback||'download'; }
+}
+
+/* =========================
+   Folder Render (with Collapse)
+========================= */
+function renderFolders(){
+  const tree=buildTree('');
+  foldersContainer.innerHTML='';
+  foldersEmpty.style.display=state.folders.length?'none':'block';
+  tree.forEach(n=>appendFolderHeader(n,true,foldersContainer));
+}
+function appendFolderHeader(node,isRoot,host){
+  const section=document.createElement('div');
+  section.className='folder-section'+(state.activeFolderId===node.id?' active':'');
+
+  const header=document.createElement('div');
+  header.className='folder-header';
+  header.dataset.id=node.id;
+
+  const left=document.createElement('div'); left.className='folder-left';
+
+  // Collapse toggle
+  const toggle=document.createElement('span');
+  toggle.className='toggle-icon';
+  const isCollapsed = !!state.collapse[node.id];
+  toggle.textContent = isCollapsed ? '▶' : '▼';
+  toggle.title = isCollapsed ? 'Expand' : 'Collapse';
+  toggle.onclick=(e)=>{
+    e.stopPropagation();
+    state.collapse[node.id]=!isCollapsed;
+    save(); renderFolders();
+  };
+
+  const title=document.createElement('span'); title.className='folder-title'; title.textContent='📁 '+node.name;
+  const count=document.createElement('span'); count.className='folder-count'; count.textContent=`(${folderCount(node.id)} items)`;
+  left.append(toggle,title,count);
+
+  
+  const actions=document.createElement('div'); actions.className='folder-actions';
+  const menu=document.createElement('div'); menu.className='folder-menu';
+  const menuBtn=document.createElement('button'); menuBtn.className='folder-menu-btn'; menuBtn.textContent='⋮';
+  menuBtn.title='Folder options';
+  menuBtn.onclick=(e)=>{
+    e.stopPropagation();
+    // toggle current, close others
+    menu.classList.toggle('show');
+    document.querySelectorAll('.folder-menu').forEach(m=>{ if(m!==menu) m.classList.remove('show'); });
+  };
+  const menuBox=document.createElement('div'); menuBox.className='folder-menu-content';
+
+  const addSub=document.createElement('button'); addSub.textContent='➕ Subfolder';
+  addSub.onclick=e=>{
+    e.stopPropagation();
+    menu.classList.remove('show');
+    const name=prompt('Subfolder name?');
+    if(!name||!name.trim()) return;
+    const f={id:uid('fld'),name:name.trim(),parentId:node.id};
+    state.folders.push(f); save(); renderFolders();
+  };
+
+  const ren=document.createElement('button'); ren.textContent='✏️ Rename';
+  ren.onclick=e=>{
+    e.stopPropagation();
+    menu.classList.remove('show');
+    const name=prompt('Rename folder:',node.name);
+    if(!name||!name.trim()) return;
+    const f=state.folders.find(x=>x.id===node.id);
+    if(f){
+      f.name=name.trim(); save(); renderFolders();
+      try{ if(state.activeFolderId===node.id && typeof viewLabel!=='undefined') viewLabel.textContent=f.name; }catch(_){}
+    }
+  };
+
+  const del=document.createElement('button'); del.textContent='🗑️ Delete';
+  del.onclick=e=>{
+    e.stopPropagation();
+    menu.classList.remove('show');
+    if(!confirm('Delete this folder and ALL of its contents?')) return;
+    if(typeof deleteFolder==='function'){ deleteFolder(node.id); }
+    else { state.folders=state.folders.filter(f=>f.id!==node.id); }
+    if(state.activeFolderId===node.id){ state.activeFolderId=''; }
+    save(); renderFolders();
+    try{ if(typeof renderMain==='function') renderMain(); }catch(_){}
+  };
+
+  menuBox.append(addSub,ren,del);
+  menu.append(menuBtn,menuBox);
+  actions.append(menu);
+
+  header.append(left,actions);
+  section.appendChild(header);
+
+  header.onclick=(e)=>{
+  if (e.target.closest('.folder-menu') || e.target.closest('.folder-menu-btn')) return;
+  if (e.dataTransfer) return; // prevent accidental trigger during drag
+  state.activeFolderId = node.id;
+  viewLabel.textContent = node.name;
+  backToMain.style.display='inline-block';
+  renderFolders(); renderMain();
+};
+
+  header.addEventListener('dragover',e=>{ e.preventDefault(); section.style.outline='2px dashed rgba(255,255,255,0.25)'; });
+  header.addEventListener('dragleave',()=>{ section.style.outline='none'; });
+  header.addEventListener('drop',e=>{
+    e.preventDefault(); section.style.outline='none';
+    const id=e.dataTransfer.getData('text/id'); if(!id) return;
+    const m=state.media[id]; if(!m) return;
+    m.folderId=node.id; save(); renderFolders(); renderMain();
+  });
+
+  // Children (respect collapse)
+  const hasChildren = node.children && node.children.length;
+  if(hasChildren){
+    const nest=document.createElement('div'); 
+    nest.style.marginLeft='16px';
+    if (isCollapsed) nest.style.display='none';
+    node.children.forEach(ch=> appendFolderHeader(ch,false,nest));
+    section.appendChild(nest);
+  }
+
+  host.appendChild(section);
+}
+function deleteFolder(id){
+  state.folders.filter(f=>f.parentId===id).forEach(ch=>deleteFolder(ch.id));
+  for(const m of Object.values(state.media)){ if(m.folderId===id){ delete state.media[m.id]; } }
+  state.folders=state.folders.filter(f=>f.id!==id);
+}
+
+/* =========================
+   Main grid render
+========================= */
+let _currentList = []; // list currently displayed (order used for viewer navigation)
+
+async function renderMain(){
+  const all=Object.values(state.media||{});
+  const q=(searchEl.value||'').trim().toLowerCase();
+  const inFolder = !!state.activeFolderId;
+  const filtered=all.filter(m=>{
+    const inScope = inFolder ? (m.folderId||'')===state.activeFolderId : !(m.folderId);
+    return inScope && (m.name||'').toLowerCase().includes(q);
+  }).sort(sorter());
+
+  // make current list available for viewer next/prev
+  _currentList = filtered;
+
+  mainList.innerHTML='';
+  if(!filtered.length){ mainEmpty.style.display='flex'; mainList.style.display='none'; return; }
+  mainEmpty.style.display='none'; mainList.style.display='flex';
+  for(const m of filtered){ mainList.appendChild(await renderItem(m)); }
+}
+
+async function renderItem(m){
+  const el=document.createElement('div');
+  el.className='vitem';
+  el.draggable=true;
+  el.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/id',m.id); });
+
+  const th=document.createElement('div'); th.className='thumb';
+  const blob=await dbGet(m.dbKey);
+  if(blob){
+    const url=URL.createObjectURL(blob);
+    if(m.type==='photo'){ const i=new Image(); i.src=url; th.appendChild(i); }
+    else { const v=document.createElement('video'); v.src=url; v.muted=true; v.playsInline=true; th.appendChild(v); }
+  }else{
+    const p=document.createElement('div'); p.textContent='(missing)'; th.appendChild(p);
+  }
+
+  const meta=document.createElement('div');
+  const h=document.createElement('h4'); h.textContent=m.name||'(untitled)';
+  const badge=document.createElement('span'); badge.className='badge'; badge.textContent=(m.type||'').toUpperCase();
+  h.appendChild(badge); meta.appendChild(h);
+
+  const actions=document.createElement('div'); actions.className='item-actions';
+  const renBtn=document.createElement('button'); renBtn.className='item-btn'; renBtn.title='Rename'; renBtn.textContent='✏️';
+  renBtn.onclick=(e)=>{
+    e.stopPropagation();
+    const newName=prompt('Rename file:',m.name);
+    if(!newName)return;
+    let finalName=newName.trim();
+    if(!finalName.toLowerCase().endsWith(m.type==='photo'?'.jpg':'.mp4')) finalName+=(m.type==='photo'?'.jpg':'.mp4');
+    m.name=finalName; save(); renderFolders(); renderMain();
+  };
+  const delBtn=document.createElement('button'); delBtn.className='item-btn'; delBtn.title='Delete'; delBtn.textContent='🗑️';
+  delBtn.onclick=async (e)=>{
+    e.stopPropagation();
+    if(!confirm('Delete "'+(m.name||'(untitled)')+'"?')) return;
+    await dbDel(m.dbKey); delete state.media[m.id]; save(); renderFolders(); renderMain();
+  };
+  actions.append(renBtn,delBtn);
+
+  el.append(th,meta,actions);
+  el.onclick=()=>openViewer(m);
+  return el;
+}
+
+/* =========================
+   Viewer (videos + photos) with Next/Prev
+========================= */
+let _currentIndex = -1;
+let _currentObjectUrl = null; // for revoke
+let _currentImgUrl = null;
+
+function hideBothMedia(){
+  viewerVideo.pause();
+  viewerVideo.src = '';
+  viewerVideo.style.display='none';
+  viewerImage.style.display='none';
+}
+function revokeCurrentUrls(){
+  if(_currentObjectUrl){ try{URL.revokeObjectURL(_currentObjectUrl);}catch(e){} _currentObjectUrl=null; }
+  if(_currentImgUrl){ try{URL.revokeObjectURL(_currentImgUrl);}catch(e){} _currentImgUrl=null; }
+}
+
+async function openViewer(m){
+  // set current index based on list
+  _currentIndex = _currentList.findIndex(x=>x.id===m.id);
+  state.viewerCurrent = m.id; save();
+
+  // Load blob and decide mode
+  const blob=await dbGet(m.dbKey); if(!blob) return;
+  revokeCurrentUrls();
+  hideBothMedia();
+
+  const url=URL.createObjectURL(blob);
+  viewerFilename.textContent=(m.type==='photo'?'📷 ':'🎞️ ')+(m.name||'');
+  viewer.classList.add('show');
+  viewer.setAttribute('aria-hidden','false');
+
+  if(m.type==='photo'){
+    _currentImgUrl = url;
+    viewerImage.src = url;
+    viewerImage.style.display='block';
+  } else {
+    _currentObjectUrl = url;
+    viewerVideo.src = url;
+    viewerVideo.style.display='block';
+    try{ await viewerVideo.play(); }catch{}
+  }
+}
+
+function navigate(offset){
+  if(_currentIndex<0) return;
+  const next = _currentIndex + offset;
+  if(next<0 || next>=_currentList.length){
+    showToast('⛔ Start/end of list'); return;
+  }
+  _currentIndex = next;
+  openViewer(_currentList[_currentIndex]);
+}
+
+viewerPrev.onclick=()=>navigate(-1);
+viewerNext.onclick=()=>navigate(1);
+
+viewerClose.onclick=()=>{ 
+  viewer.classList.remove('show'); 
+  viewer.setAttribute('aria-hidden','true'); 
+  hideBothMedia(); 
+  revokeCurrentUrls();
+};
+viewer.addEventListener('click',e=>{ if(e.target===viewer) viewerClose.click(); });
+
+// Optional: keyboard navigation
+document.addEventListener('keydown',(e)=>{
+  if(viewer.getAttribute('aria-hidden')==='false'){
+    if(e.key==='ArrowRight') navigate(1);
+    else if(e.key==='ArrowLeft') navigate(-1);
+    else if(e.key==='Escape') viewerClose.click();
+  }
+});
+
+/* =========================
+   Buttons & Uploads
+========================= */
+addFolderBtn.onclick=()=>{
+  const n=(newFolderName.value||'').trim(); if(!n) return;
+  const f={id:uid('fld'),name:n,parentId:''}; state.folders.push(f); save(); newFolderName.value=''; renderFolders();
+};
+addVideos.onclick=()=> videoInput.click();
+addPhotos.onclick=()=> photoInput.click();
+
+videoInput.onchange=async e=>{
+  for(const f of Array.from(e.target.files||[])){
+    const id=uid('vid'); await dbPut(id,f);
+    state.media[id]={id,name:f.name,type:'video',dbKey:id,createdAt:Date.now(),folderId:state.activeFolderId||''};
+  }
+  save(); renderFolders(); renderMain(); videoInput.value='';
+  showToast('✅ Videos added to library');
+};
+photoInput.onchange=async e=>{
+  for(const f of Array.from(e.target.files||[])){
+    const id=uid('img'); await dbPut(id,f);
+    state.media[id]={id,name:f.name,type:'photo',dbKey:id,createdAt:Date.now(),folderId:state.activeFolderId||''};
+  }
+  save(); renderFolders(); renderMain(); photoInput.value='';
+  showToast('✅ Photos added to library');
+};
+
+searchEl.oninput=()=>{ renderMain(); };
+sortBtn.onclick=()=>{ state.sort=state.sort==='newest'?'oldest':'newest'; sortBtn.textContent=state.sort==='newest'?'📅 Sort: Newest':'📅 Sort: Oldest'; save(); renderMain(); };
+backToMain.onclick=()=>{ state.activeFolderId=''; backToMain.style.display='none'; viewLabel.textContent='Main Library'; renderFolders(); renderMain(); };
+
+/* Drag to main grid root (remove from folder) */
+mainList.addEventListener('dragover',e=>{ e.preventDefault(); mainList.style.outline='2px dashed rgba(255,255,255,0.25)'; });
+mainList.addEventListener('dragleave',()=>{ mainList.style.outline='none'; });
+mainList.addEventListener('drop',e=>{
+  e.preventDefault(); mainList.style.outline='none';
+  const id=e.dataTransfer.getData('text/id'); if(!id) return;
+  const m=state.media[id]; if(!m) return;
+  if(state.activeFolderId){ return; } // only allow drop to root when viewing Main Library
+  m.folderId=''; save(); renderFolders(); renderMain();
+});
+
+/* =========================
+   Downloader Shared State
+========================= */
+const tweetUrl=document.getElementById('tweetUrl');
+const fetchTweet=document.getElementById('fetchTweet');
+const tweetPreview=document.getElementById('tweetPreview');
+const tweetMediaBox=document.getElementById('tweetMediaBox');
+const qualitySelect=document.getElementById('qualitySelect');
+const saveFromTweet=document.getElementById('saveFromTweet');
+const fetchMode=document.getElementById('fetchMode');
+
+let tweetFetched={type:null,name:null,blob:null,variants:[],defaultUrl:null};
+
+/* =========================
+   Fetchers - ENHANCED TWITTER/X DOWNLOADER WITH MULTIPLE APIS
+========================= */
+async function fetchFromTwitter(url){
+  tweetPreview.style.display='block';
+  saveFromTweet.style.display='none';
+  qualitySelect.style.display='none';
+  tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media from multiple APIs…</div>';
+
+  try {
+    const match = url.match(/(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([^\/]+)\/status\/(\d+)/i);
+    if(!match){
+      tweetMediaBox.innerHTML='<div class="small">⚠️ Invalid Twitter/X URL format.</div>';
+      return;
+    }
+    const username = match[1];
+    const tweetId = match[2];
+    
+    // Multiple free API endpoints
+    const apiEndpoints = [
+      // Fxtwitter API
+      `https://api.fxtwitter.com/${username}/status/${tweetId}`,
+      // VxTwitter API
+      `https://api.vxtwitter.com/${username}/status/${tweetId}`,
+      // Twiiit API
+      `https://twiiit.com/api/v1/twitter/tweet/${tweetId}`,
+      // Bird API
+      `https://bird.tube/api/twitter/?url=${encodeURIComponent(url)}`,
+    ];
+
+    // Nitter instances for HTML scraping fallback
+    const nitterInstances = [
+      'https://nitter.net',
+      'https://nitter.it', 
+      'https://nitter.unixfox.eu',
+      'https://nitter.privacydev.net',
+      'https://nitter.poast.org'
+    ];
+
+    let data = null;
+    let lastError = null;
+
+    // Try each API endpoint until one works
+    for (const apiUrl of apiEndpoints) {
+      try {
+        console.log(`Trying API: ${apiUrl}`);
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          data = await res.json();
+          console.log('API response success:', data);
+          break;
+        } else {
+          console.log(`API ${apiUrl} returned status: ${res.status}`);
+        }
+      } catch (err) {
+        lastError = err;
+        console.log(`API ${apiUrl} failed:`, err);
+      }
+    }
+
+    // If APIs fail, try Nitter instances
+    if (!data) {
+      console.log('Trying Nitter instances as fallback...');
+      for (const nitterInstance of nitterInstances) {
+        try {
+          const nitterUrl = `${nitterInstance}/${username}/status/${tweetId}`;
+          console.log(`Trying Nitter: ${nitterUrl}`);
+          const response = await fetch(nitterUrl);
+          if (response.ok) {
+            const html = await response.text();
+            data = await parseNitterHTML(html, tweetId);
+            if (data) break;
+          }
+        } catch (err) {
+          console.log(`Nitter ${nitterInstance} failed:`, err);
+        }
+      }
+    }
+
+    if (!data) {
+      throw new Error('All Twitter API endpoints and Nitter instances failed');
+    }
+
+    tweetMediaBox.innerHTML='';
+    tweetFetched={type:null,name:null,blob:null,variants:[],defaultUrl:null};
+
+    // Process the data based on API format
+    await processTwitterData(data, username, tweetId);
+
+  } catch (e) {
+    console.error('Twitter fetch error:', e);
+    tweetMediaBox.innerHTML = `
+      <div class="small">
+        ⚠️ Failed to fetch media: ${e.message}. 
+        <br>Try using "Generic / Direct Media" mode instead.
+        <br>Some Twitter APIs may be temporarily unavailable.
+      </div>`;
+  }
+}
+
+// Parse Nitter HTML for media
+async function parseNitterHTML(html, tweetId) {
+  console.log('Parsing Nitter HTML...');
+  
+  // Look for video elements
+  const videoMatch = html.match(/<video[^>]*>[\s\S]*?<source[^>]*src="([^"]+)"/i);
+  const galleryMatch = html.match(/class="still-image"[^>]*src="([^"]+)"/i);
+  const metaImageMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+  const metaVideoMatch = html.match(/<meta[^>]*property="og:video"[^>]*content="([^"]+)"/i);
+  
+  let mediaUrl = null;
+  let isVideo = false;
+  
+  if (videoMatch && videoMatch[1]) {
+    mediaUrl = videoMatch[1];
+    isVideo = true;
+  } else if (metaVideoMatch && metaVideoMatch[1]) {
+    mediaUrl = metaVideoMatch[1];
+    isVideo = true;
+  } else if (galleryMatch && galleryMatch[1]) {
+    mediaUrl = galleryMatch[1];
+    isVideo = false;
+  } else if (metaImageMatch && metaImageMatch[1]) {
+    mediaUrl = metaImageMatch[1];
+    isVideo = false;
+  }
+  
+  if (mediaUrl) {
+    // Convert relative URLs to absolute
+    if (mediaUrl.startsWith('//')) {
+      mediaUrl = 'https:' + mediaUrl;
+    } else if (mediaUrl.startsWith('/')) {
+      mediaUrl = 'https://nitter.net' + mediaUrl;
+    }
+    
+    return {
+      media: [{
+        type: isVideo ? 'video' : 'photo',
+        url: mediaUrl
+      }]
+    };
+  }
+  
+  return null;
+}
+
+// Process different API response formats
+async function processTwitterData(data, username, tweetId) {
+  let mediaUrl = null;
+  let isVideo = false;
+  let variants = [];
+
+  console.log('Processing Twitter data:', data);
+
+  // Fxtwitter API format
+  if (data.tweet && data.tweet.media) {
+    const media = data.tweet.media;
+    if (media.videos) {
+      isVideo = true;
+      const video = media.videos[0];
+      mediaUrl = video.url;
+      if (video.variants) {
+        variants = video.variants.filter(v => v.url);
+      }
+    } else if (media.photos) {
+      const photo = media.photos[0];
+      mediaUrl = photo.url;
+    }
+  }
+  // VxTwitter API format
+  else if (data.media_extended) {
+    const media = data.media_extended[0];
+    if (media.type === 'video') {
+      isVideo = true;
+      mediaUrl = media.url;
+      if (media.variants) {
+        variants = media.variants.filter(v => v.url);
+      }
+    } else if (media.type === 'image') {
+      mediaUrl = media.url;
+    }
+  }
+  // Twiiit API format
+  else if (data.media) {
+    const media = data.media[0];
+    if (media.type === 'video' || media.type === 'animated_gif') {
+      isVideo = true;
+      mediaUrl = media.video_url;
+      if (media.variants) {
+        variants = media.variants.filter(v => v.url);
+      }
+    } else if (media.type === 'photo') {
+      mediaUrl = media.media_url_https || media.url;
+    }
+  }
+  // Bird API format
+  else if (data.url) {
+    mediaUrl = data.url;
+    isVideo = data.type === 'video';
+  }
+  // Nitter format
+  else if (data.media) {
+    const media = data.media[0];
+    mediaUrl = media.url;
+    isVideo = media.type === 'video';
+  }
+
+  console.log('Found media URL:', mediaUrl, 'isVideo:', isVideo);
+
+  if (mediaUrl) {
+    // Clean up the URL
+    mediaUrl = mediaUrl.replace(/&amp;/g, '&');
+    
+    if (isVideo) {
+      const vr = document.createElement('video');
+      vr.src = mediaUrl; 
+      vr.controls = true; 
+      vr.autoplay = false;
+      vr.muted = true;
+      vr.style.maxWidth = '100%'; 
+      vr.style.borderRadius = '10px';
+      vr.style.maxHeight = '300px';
+      tweetMediaBox.appendChild(vr);
+
+      tweetFetched.type = 'video';
+      tweetFetched.name = `tweet_${tweetId}.mp4`;
+      tweetFetched.defaultUrl = mediaUrl;
+      tweetFetched.variants = variants.length ? variants : [{url: mediaUrl, bitrate: 0, label: 'Default'}];
+
+      if (variants.length > 1) {
+        qualitySelect.innerHTML = '';
+        variants.forEach((x, i) => {
+          const kbps = x.bitrate ? Math.round(x.bitrate / 1000) + ' kbps' : 'auto';
+          const label = x.bitrate ? (x.bitrate >= 2_000_000 ? 'HD' : (x.bitrate >= 1_000_000 ? 'SD' : 'Low')) : 'Auto';
+          const opt = document.createElement('option');
+          opt.value = x.url;
+          opt.textContent = `${label} (${kbps})`;
+          if (i === 0) opt.selected = true;
+          qualitySelect.appendChild(opt);
+        });
+        qualitySelect.style.display = 'block';
+        qualitySelect.onchange = (e) => { 
+          vr.src = e.target.value; 
+          vr.load();
+        };
+      }
+
+      saveFromTweet.style.display = 'inline-block';
+
+    } else {
+      const ir = new Image();
+      ir.src = mediaUrl; 
+      ir.style.maxWidth = '100%'; 
+      ir.style.borderRadius = '10px';
+      ir.style.maxHeight = '300px';
+      ir.onload = async () => {
+        try {
+          // Use CORS proxy for images from Twitter
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(mediaUrl)}`;
+          const response = await fetch(proxyUrl);
+          if (response.ok) {
+            tweetFetched.blob = await response.blob();
+          }
+        } catch (e) {
+          console.error('Failed to fetch image blob:', e);
+        }
+      };
+      tweetMediaBox.appendChild(ir);
+      
+      tweetFetched.type = 'photo';
+      tweetFetched.name = `tweet_${tweetId}.jpg`;
+      tweetFetched.defaultUrl = mediaUrl;
+      saveFromTweet.style.display = 'inline-block';
+    }
+
+    // Add tweet info
+    const tweetInfo = document.createElement('div');
+    tweetInfo.className = 'small';
+    tweetInfo.style.marginTop = '8px';
+    tweetInfo.innerHTML = `From: @${username} | Source: ${getApiSource(data)}`;
+    tweetMediaBox.appendChild(tweetInfo);
+
+  } else {
+    tweetMediaBox.innerHTML = `
+      <div class="small">
+        ⚠️ No media found in this tweet. This could be because:
+        <ul style="text-align: left; margin: 8px 0;">
+          <li>The tweet is text-only</li>
+          <li>The media is not accessible via free APIs</li>
+          <li>The tweet might be from a protected account</li>
+          <li>All free APIs are temporarily rate-limited</li>
+        </ul>
+        Try using "Generic / Direct Media" mode instead.
+      </div>`;
+  }
+}
+
+// Helper to identify API source
+function getApiSource(data) {
+  if (data.tweet) return 'Fxtwitter API';
+  if (data.media_extended) return 'VxTwitter API';
+  if (data.media && data.media[0] && data.media[0].media_url_https) return 'Twiiit API';
+  if (data.url && data.type) return 'Bird API';
+  return 'Nitter';
+}
+
+async function fetchFromGeneric(url){
+  tweetPreview.style.display='block';
+  saveFromTweet.style.display='none';
+  qualitySelect.style.display='none';
+  tweetMediaBox.innerHTML='<div class="small">⏳ Fetching media…</div>';
+  tweetFetched={type:null,name:null,blob:null,variants:[],defaultUrl:null};
+
+  try {
+    if(/^\/\//.test(url)){ url = location.protocol + url; }
+
+    if (isDirectMedia(url)) {
+      const isVideo = /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url);
+      const name = filenameFromUrl(url, isVideo?'video.mp4':'image.jpg');
+      tweetMediaBox.innerHTML='';
+      if (isVideo) {
+        const v=document.createElement('video');
+        v.src=url; v.controls=true; v.autoplay=false; v.muted=true;
+        v.style.maxWidth='100%'; v.style.borderRadius='10px';
+        v.style.maxHeight='300px';
+        tweetMediaBox.appendChild(v);
+        tweetFetched.type='video';
+        tweetFetched.defaultUrl=url;
+        tweetFetched.name=name;
+      } else {
+        const i=new Image();
+        i.src=url; i.style.maxWidth='100%'; i.style.borderRadius='10px';
+        i.style.maxHeight='300px';
+        i.onload = async () => {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              tweetFetched.blob = await response.blob();
+            }
+          } catch (e) {
+            console.error('Failed to fetch image blob:', e);
+          }
+        };
+        tweetMediaBox.appendChild(i);
+        tweetFetched.type='photo';
+        tweetFetched.name=name;
+        tweetFetched.defaultUrl=url;
+      }
+      saveFromTweet.style.display='inline-block';
+      return;
+    }
+
+    // Reddit JSON
+    if (/reddit\.com\//i.test(url)) {
+      const jsonUrl = url.replace(/\/?$/, '') + '.json';
+      const res = await fetch(jsonUrl);
+      if (!res.ok) throw new Error('Reddit JSON fetch failed');
+      const data = await res.json();
+      const post = data?.[0]?.data?.children?.[0]?.data;
+      tweetMediaBox.innerHTML='';
+
+      if (post?.secure_media?.reddit_video?.fallback_url) {
+        const vurl = post.secure_media.reddit_video.fallback_url;
+        const v=document.createElement('video');
+        v.src=vurl; v.controls=true; v.autoplay=false; v.muted=true;
+        v.style.maxWidth='100%'; v.style.borderRadius='10px';
+        v.style.maxHeight='300px';
+        tweetMediaBox.appendChild(v);
+        tweetFetched.type='video';
+        tweetFetched.defaultUrl=vurl;
+        tweetFetched.name=filenameFromUrl(vurl,'reddit_video.mp4');
+        saveFromTweet.style.display='inline-block';
+        return;
+      }
+      const imgUrl =
+        (post?.preview?.images?.[0]?.source?.url) ||
+        (post?.url_overridden_by_dest && /\.(jpg|jpeg|png|gif)(\?.*)?$/i.test(post.url_overridden_by_dest) ? post.url_overridden_by_dest : null) ||
+        null;
+      if (imgUrl) {
+        const unescapedUrl = htmlUnescape(imgUrl);
+        const i=new Image();
+        i.src=unescapedUrl;
+        i.style.maxWidth='100%'; i.style.borderRadius='10px';
+        i.style.maxHeight='300px';
+        i.onload = async () => {
+          try {
+            const response = await fetch(unescapedUrl);
+            if (response.ok) {
+              tweetFetched.blob = await response.blob();
+            }
+          } catch (e) {
+            console.error('Failed to fetch image blob:', e);
+          }
+        };
+        tweetMediaBox.appendChild(i);
+        tweetFetched.type='photo';
+        tweetFetched.name=filenameFromUrl(unescapedUrl,'reddit_image.jpg');
+        tweetFetched.defaultUrl=unescapedUrl;
+        saveFromTweet.style.display='inline-block';
+        return;
+      }
+      // Fall through to page scrape if not found
+    }
+
+    // Generic page scrape (best-effort; may be blocked by CORS)
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('HTML fetch failed');
+      const html = await res.text();
+
+      if (deepScanEnabled()) {
+        const ogVideo = html.match(/<meta[^>]+property=["']og:video["'][^>]+content=["']([^"']+)["']/i);
+        const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+        const preloadVideo = html.match(/<link[^>]+rel=["']preload["'][^>]+as=["']video["'][^>]+href=["']([^"']+)["']/i);
+        const preloadImage = html.match(/<link[^>]+rel=["']image["'][^>]+href=["']([^"']+)["']/i) || html.match(/<link[^>]+rel=["']preload["'][^>]+as=["']image["'][^>]+href=["']([^"']+)["']/i);
+
+        let hintedUrl = null;
+        let hintedIsVideo = false;
+        if (ogVideo) { hintedUrl = ogVideo[1]; hintedIsVideo = true; }
+        else if (preloadVideo) { hintedUrl = preloadVideo[1]; hintedIsVideo = true; }
+        else if (ogImage) { hintedUrl = ogImage[1]; }
+        else if (preloadImage) { hintedUrl = preloadImage[1]; }
+
+        if (hintedUrl) {
+          try {
+            const base = new URL(url);
+            if (hintedUrl.startsWith('//')) hintedUrl = base.protocol + hintedUrl;
+            else if (hintedUrl.startsWith('/')) hintedUrl = base.origin + hintedUrl;
+            else if (!/^https?:/i.test(hintedUrl)) {
+              hintedUrl = base.origin.replace(/\/$/, '') + '/' + hintedUrl.replace(/^\.\//,'').replace(/^\//,'');
+            }
+          } catch {}
+
+          tweetMediaBox.innerHTML='';
+          if (hintedIsVideo) {
+            const v=document.createElement('video');
+            v.src=hintedUrl; v.controls=true; v.autoplay=false; v.muted=true;
+            v.style.maxWidth='100%'; v.style.borderRadius='10px';
+            v.style.maxHeight='300px';
+            tweetMediaBox.appendChild(v);
+            tweetFetched.type='video';
+            tweetFetched.defaultUrl=hintedUrl;
+            tweetFetched.name=filenameFromUrl(hintedUrl,'video.mp4');
+          } else {
+            const i=new Image();
+            i.src=hintedUrl; i.style.maxWidth='100%'; i.style.borderRadius='10px';
+            i.style.maxHeight='300px';
+            i.onload = async () => {
+              try {
+                const response = await fetch(hintedUrl);
+                if (response.ok) {
+                  tweetFetched.blob = await response.blob();
+                }
+              } catch (e) {
+                console.error('Failed to fetch image blob:', e);
+              }
+            };
+            tweetMediaBox.appendChild(i);
+            tweetFetched.type='photo';
+            tweetFetched.name=filenameFromUrl(hintedUrl,'image.jpg');
+            tweetFetched.defaultUrl=hintedUrl;
+          }
+          saveFromTweet.style.display='inline-block';
+          return;
+        }
+      }
+
+      const videoSrc = (html.match(/<video[^>]+src=["']([^"']+)["']/i)?.[1]) ||
+                       (html.match(/<source[^>]+src=["']([^"']+)["'][^>]*>(?=[\s\S]*?<\/video>)/i)?.[1]) ||
+                       null;
+
+      let mediaUrl = videoSrc;
+      let isVideo = !!videoSrc;
+
+      if (!mediaUrl) {
+        const imgDataSrc = html.match(/<img[^>]+data-src=["']([^"']+)["']/i)?.[1];
+        const imgSrc = imgDataSrc || (html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]) || null;
+        if (imgSrc) { mediaUrl = imgSrc; isVideo = false; }
+      }
+
+      if (mediaUrl) {
+        try {
+          const base = new URL(url);
+          if (mediaUrl.startsWith('//')) mediaUrl = base.protocol + mediaUrl;
+          else if (mediaUrl.startsWith('/')) mediaUrl = base.origin + mediaUrl;
+          else if (!/^https?:/i.test(mediaUrl)) {
+            mediaUrl = base.origin.replace(/\/$/, '') + '/' + mediaUrl.replace(/^\.\//,'').replace(/^\//,'');
+          }
+        } catch {}
+
+        tweetMediaBox.innerHTML='';
+        if (isVideo) {
+          const v=document.createElement('video');
+          v.src=mediaUrl; v.controls=true; v.autoplay=false; v.muted=true;
+          v.style.maxWidth='100%'; v.style.borderRadius='10px';
+          v.style.maxHeight='300px';
+          tweetMediaBox.appendChild(v);
+          tweetFetched.type='video';
+          tweetFetched.defaultUrl=mediaUrl;
+          tweetFetched.name=filenameFromUrl(mediaUrl,'video.mp4');
+        } else {
+          const i=new Image();
+          i.src=mediaUrl; i.style.maxWidth='100%'; i.style.borderRadius='10px';
+          i.style.maxHeight='300px';
+          i.onload = async () => {
+            try {
+              const response = await fetch(mediaUrl);
+              if (response.ok) {
+                tweetFetched.blob = await response.blob();
+              }
+            } catch (e) {
+              console.error('Failed to fetch image blob:', e);
+            }
+          };
+          tweetMediaBox.appendChild(i);
+          tweetFetched.type='photo';
+          tweetFetched.name=filenameFromUrl(mediaUrl,'image.jpg');
+          tweetFetched.defaultUrl=mediaUrl;
+        }
+
+        saveFromTweet.style.display='inline-block';
+        return;
+      }
+    } catch (inner) {
+      // If CORS blocks the HTML fetch, fall through to fallback message
+    }
+
+    tweetMediaBox.innerHTML='<div class="small">⚠️ No media found. Paste a direct .mp4/.jpg URL or a page with an embedded video/image. Some sites block fetching via the browser (CORS).</div>';
+  } catch (e) {
+    console.error(e);
+    tweetMediaBox.innerHTML='<div class="small">⚠️ Failed to fetch that URL. The site may block cross-origin requests.</div>';
+  }
+}
+
+/* =========================
+   Event Wiring (FIXED)
+========================= */
+fetchTweet.onclick = async () => {
+  const url=(tweetUrl.value||'').trim();
+  if(!url){ 
+    showToast('Please enter a valid URL');
+    return; 
+  }
+  
+  // Show loading state
+  fetchTweet.disabled = true;
+  fetchTweet.textContent = '⏳ Fetching...';
+  
+  try {
+    const mode = fetchMode ? fetchMode.value : 'twitter';
+    if (mode === 'twitter') await fetchFromTwitter(url);
+    else await fetchFromGeneric(url);
+  } catch (error) {
+    console.error('Fetch error:', error);
+    showToast('❌ Fetch failed: ' + error.message);
+  } finally {
+    // Restore button state
+    fetchTweet.disabled = false;
+    fetchTweet.textContent = 'Fetch Media';
+  }
+};
+
+saveFromTweet.onclick = async () => {
+  try {
+    if(!tweetFetched || (!tweetFetched.defaultUrl && !tweetFetched.blob)){
+      alert('Nothing to save yet. Fetch media first.');
+      return;
+    }
+    
+    // Show saving state
+    saveFromTweet.disabled = true;
+    saveFromTweet.textContent = '⏳ Saving...';
+    
+    let blob = tweetFetched.blob;
+    
+    // If we don't have a blob yet, fetch it from the URL
+    if(!blob && tweetFetched.defaultUrl){
+      console.log('Fetching blob from URL:', tweetFetched.defaultUrl);
+      
+      // Use CORS proxy for Twitter videos
+      let fetchUrl = tweetFetched.defaultUrl;
+      if (tweetFetched.type === 'video' && tweetFetched.defaultUrl.includes('twitter.com')) {
+        fetchUrl = `https://corsproxy.io/?${encodeURIComponent(tweetFetched.defaultUrl)}`;
+      }
+      
+      const response = await fetch(fetchUrl);
+      if(!response.ok) throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      blob = await response.blob();
+    }
+    
+    if (!blob) {
+      throw new Error('No media data available to save');
+    }
+    
+    const id = tweetFetched.type==='photo' ? uid('img') : uid('vid');
+    await dbPut(id, blob);
+    state.media[id] = {
+      id,
+      name: tweetFetched.name || (tweetFetched.type==='photo'?'image.jpg':'video.mp4'),
+      type: tweetFetched.type || (/image\//.test(blob.type)?'photo':'video'),
+      dbKey: id,
+      createdAt: Date.now(),
+      folderId: state.activeFolderId || ''
+    };
+    save(); 
+    renderFolders(); 
+    renderMain();
+    
+    showToast('✅ Saved to library');
+    
+    // Reset the downloader state
+    tweetPreview.style.display = 'none';
+    tweetUrl.value = '';
+    tweetFetched = {type:null,name:null,blob:null,variants:[],defaultUrl:null};
+    
+  } catch (err) {
+    console.error('Save error:', err);
+    alert('Failed to save media: ' + err.message);
+  } finally {
+    // Restore button state
+    saveFromTweet.disabled = false;
+    saveFromTweet.textContent = '⬇️ Download to Library';
+  }
+};
+
+/* =========================
+   Initial render
+========================= */
+renderFolders();
+renderMain();
+
+
+// Auto-close any open folder menus when clicking outside
+document.addEventListener('click', (ev)=>{
+  document.querySelectorAll('.folder-menu.show').forEach(m=>{
+    // if the click is inside this menu, keep it open; else close
+    if(!m.contains(ev.target)) m.classList.remove('show');
+  });
+});
+
+/* =========================
+   Import/Export (Built-in APIs only)
+   - Export: builds a ZIP (store-only) with metadata.json + media blobs
+   - Import: reads an unzipped folder (webkitdirectory) and restores structure/blobs
+========================= */
+
+/* ----- Minimal ZIP (STORE) Writer ----- */
+class ZipStoreWriter {
+  constructor() {
+    this.files = [];
+    this.encoder = new TextEncoder();
+    this.size = 0;
+  }
+  _dosDateTime(date=new Date()) {
+    const year = date.getFullYear();
+    const dosTime = ((date.getHours() & 0x1F) << 11) | ((date.getMinutes() & 0x3F) << 5) | ((Math.floor(date.getSeconds()/2)) & 0x1F);
+    const dosDate = (((year - 1980) & 0x7F) << 9) | (((date.getMonth()+1) & 0x0F) << 5) | (date.getDate() & 0x1F);
+    return {dosTime, dosDate};
+  }
+  async addFile(path, blob) {
+    const nameBytes = this.encoder.encode(path.replace(/^\/+/, ""));
+    const {dosTime,dosDate} = this._dosDateTime(new Date());
+    const crc = await this._crc32Blob(blob);
+    const size = blob.size;
+
+    // Local file header
+    const localHeader = new DataView(new ArrayBuffer(30));
+    let p = 0;
+    // signature
+    localHeader.setUint32(p, 0x04034b50, true); p+=4;
+    // version needed to extract
+    localHeader.setUint16(p, 20, true); p+=2;
+    // general purpose bit flag
+    localHeader.setUint16(p, 0, true); p+=2;
+    // compression method 0 = store
+    localHeader.setUint16(p, 0, true); p+=2;
+    // file last mod time/date
+    localHeader.setUint16(p, dosTime, true); p+=2;
+    localHeader.setUint16(p, dosDate, true); p+=2;
+    // crc-32
+    localHeader.setUint32(p, crc>>>0, true); p+=4;
+    // comp size
+    localHeader.setUint32(p, size, true); p+=4;
+    // uncomp size
+    localHeader.setUint32(p, size, true); p+=4;
+    // file name length
+    localHeader.setUint16(p, nameBytes.length, true); p+=2;
+    // extra field length
+    localHeader.setUint16(p, 0, true); p+=2;
+
+    const localHeaderBlob = new Blob([localHeader, nameBytes, blob]);
+    const localHeaderSize = 30 + nameBytes.length;
+    const localFileHeaderOffset = this.size;
+    this.size += localHeaderSize + size;
+
+    // Central directory header (we gather now; written later)
+    const cdHeader = new DataView(new ArrayBuffer(46));
+    p = 0;
+    cdHeader.setUint32(p, 0x02014b50, true); p+=4; // signature
+    cdHeader.setUint16(p, 20, true); p+=2; // version made by
+    cdHeader.setUint16(p, 20, true); p+=2; // version needed to extract
+    cdHeader.setUint16(p, 0, true); p+=2; // flags
+    cdHeader.setUint16(p, 0, true); p+=2; // method
+    cdHeader.setUint16(p, dosTime, true); p+=2;
+    cdHeader.setUint16(p, dosDate, true); p+=2;
+    cdHeader.setUint32(p, crc>>>0, true); p+=4;
+    cdHeader.setUint32(p, size, true); p+=4;
+    cdHeader.setUint32(p, size, true); p+=4;
+    cdHeader.setUint16(p, nameBytes.length, true); p+=2;
+    cdHeader.setUint16(p, 0, true); p+=2; // extra len
+    cdHeader.setUint16(p, 0, true); p+=2; // comment len
+    cdHeader.setUint16(p, 0, true); p+=2; // disk number start
+    cdHeader.setUint16(p, 0, true); p+=2; // internal attrs
+    cdHeader.setUint32(p, 0, true); p+=4; // external attrs
+    cdHeader.setUint32(p, localFileHeaderOffset, true); p+=4;
+
+    this.files.push({
+      local: localHeaderBlob,
+      central: new Blob([cdHeader, nameBytes])
+    });
+  }
+  async _crc32Blob(blob) {
+    // Streaming CRC32 over the blob
+    const table = ZipStoreWriter._crcTable || (ZipStoreWriter._crcTable = (()=>{
+      let c, table = new Uint32Array(256);
+      for (let n=0;n<256;n++){
+        c = n;
+        for (let k=0;k<8;k++){
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[n] = c >>> 0;
+      }
+      return table;
+    })());
+    let crc = 0 ^ (-1);
+    const reader = blob.stream().getReader();
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      const arr = new Uint8Array(value);
+      for (let i=0;i<arr.length;i++){
+        crc = (crc >>> 8) ^ table[(crc ^ arr[i]) & 0xFF];
+      }
+    }
+    return (crc ^ (-1)) >>> 0;
+  }
+  async build(filename="RomaniMediaArchive_Backup.zip") {
+    // concat locals
+    const localParts = this.files.map(f=>f.local);
+    const centralParts = this.files.map(f=>f.central);
+    const centralSize = (await new Blob(centralParts).arrayBuffer()).byteLength;
+    const centralOffset = this.size;
+    const end = new DataView(new ArrayBuffer(22));
+    let p=0;
+    end.setUint32(p, 0x06054b50, true); p+=4; // EOCD signature
+    end.setUint16(p, 0, true); p+=2; // disk number
+    end.setUint16(p, 0, true); p+=2; // start disk
+    end.setUint16(p, this.files.length, true); p+=2; // entries on this disk
+    end.setUint16(p, this.files.length, true); p+=2; // total entries
+    end.setUint32(p, centralSize, true); p+=4;
+    end.setUint32(p, centralOffset, true); p+=4;
+    end.setUint16(p, 0, true); p+=2; // comment length
+
+    const zipBlob = new Blob([
+      ...localParts,
+      ...centralParts,
+      end
+    ], {type: 'application/zip'});
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 0);
+  }
+}
+
+/* ----- Helpers: path building for folders ----- */
+function buildFolderPathMap() {
+  const byId = Object.fromEntries(state.folders.map(f=>[f.id, f]));
+  const cache = {};
+  function pathFor(id){
+    if(!id) return ""; // root
+    if(cache[id]) return cache[id];
+    const node = byId[id];
+    if(!node) return "";
+    const parentPath = pathFor(node.parentId||"");
+    const p = (parentPath ? (parentPath + "/") : "") + node.name;
+    return cache[id]=p;
+  }
+  return pathFor;
+}
+
+/* ----- Export Library (ZIP) ----- */
+async function exportLibraryZip(){
+  try {
+    showToast('⏳ Preparing export...');
+    const writer = new ZipStoreWriter();
+    const pathFor = buildFolderPathMap();
+
+    // 1) metadata.json (state snapshot)
+    const meta = JSON.stringify({ state }, null, 2);
+    await writer.addFile("metadata.json", new Blob([meta], {type:"application/json"}));
+
+    // 2) Media blobs at folder paths
+    const items = Object.values(state.media||{});
+    let count = 0;
+    for (const m of items){
+      const blob = await dbGet(m.dbKey);
+      if(!blob) continue;
+      const folderPath = pathFor(m.folderId||"");
+      const basePath = folderPath || "Main Library";
+      const fpath = (basePath ? basePath + "/" : "") + (m.name || (m.type==='photo'?'image.jpg':'video.mp4'));
+      await writer.addFile(fpath, blob);
+      count++;
+    }
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    await writer.build(`RomaniMediaArchive_Backup_${stamp}.zip`);
+    showToast('✅ Library exported successfully');
+  } catch (e){
+    console.error(e);
+    alert('Export failed.');
+  }
+}
+
+/* ----- Import Library (unzipped folder) ----- */
+async function importLibraryFolder(fileList){
+  try{
+    showToast('⏳ Importing folder...');
+    // Build map of path -> File
+    const files = Array.from(fileList||[]);
+    if(!files.length){ alert('No folder selected'); return; }
+
+    // Find metadata.json (optional but preferred)
+    const metaEntry = files.find(f=>/(^|\/)metadata\.json$/i.test(f.webkitRelativePath || f.name));
+    let meta = null;
+    if(metaEntry){
+      try{
+        const text = await metaEntry.text();
+        meta = JSON.parse(text);
+      }catch(e){ console.warn('metadata.json parse failed', e); }
+    }
+
+    // Create folders as needed based on paths
+    const folderIdByPath = new Map();
+    function ensureFolder(path){
+      path = path.replace(/^\/+|\/+$/g,'');
+      if(!path) return ''; // root
+      if(folderIdByPath.has(path)) return folderIdByPath.get(path);
+      const parts = path.split('/');
+      let curPath = '';
+      let parentId = '';
+      for(const part of parts){
+        curPath = curPath ? (curPath + '/' + part) : part;
+        if(folderIdByPath.has(curPath)){ parentId = folderIdByPath.get(curPath); continue; }
+        // Skip treating "Main Library" as a subfolder — use root
+        if (part === 'Main Library' && curPath === 'Main Library'){ folderIdByPath.set(curPath, ''); parentId=''; continue; }
+        const f = {id:uid('fld'), name:part, parentId};
+        state.folders.push(f);
+        folderIdByPath.set(curPath, f.id);
+        parentId = f.id;
+      }
+      return folderIdByPath.get(path);
+    }
+
+    // Import media files
+    const mediaRe = /\.(mp4|webm|mov|m4v|jpg|jpeg|png|gif)$/i;
+    let imported = 0;
+    for(const f of files){
+      const rel = (f.webkitRelativePath || f.name);
+      if (/metadata\.json$/i.test(rel)) continue;
+      if (!mediaRe.test(rel)) continue;
+      // Folder path is dirname of rel
+      const parts = rel.split('/');
+      parts.pop(); // remove filename
+      const folderPath = parts.join('/');
+      const folderId = ensureFolder(folderPath);
+      const blob = f; // File IS a Blob
+      const id = mediaRe.test(rel) && /\.(jpg|jpeg|png|gif)$/i.test(rel) ? uid('img') : uid('vid');
+      await dbPut(id, blob);
+      state.media[id] = {
+        id,
+        name: f.name,
+        type: /\.(jpg|jpeg|png|gif)$/i.test(f.name) ? 'photo' : 'video',
+        dbKey: id,
+        createdAt: Date.now(),
+        folderId: folderId || ''
+      };
+      imported++;
+    }
+
+    save(); renderFolders(); renderMain();
+    showToast(`✅ Imported ${imported} file(s)`);
+  }catch(e){
+    console.error(e);
+    alert('Import failed.');
+  }
+}
+
+/* ----- Wire up buttons ----- */
+const exportBtn = document.getElementById('exportLibrary');
+const importBtn = document.getElementById('importLibrary');
+const importFolderInput = document.getElementById('importFolderInput');
+
+if (exportBtn) exportBtn.onclick = exportLibraryZip;
+if (importBtn) importBtn.onclick = ()=> importFolderInput.click();
+if (importFolderInput) importFolderInput.onchange = (e)=>{
+  importLibraryFolder(e.target.files);
+  importFolderInput.value = '';
+};
+
+</script>
+
+</body>
+</html>
